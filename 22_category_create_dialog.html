@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <style>
+      body { font-family: Arial, sans-serif; padding: 20px; margin: 0; }
+      h2 { color: #1976d2; margin-top: 0; font-size: 18px; }
+      .field { margin: 15px 0; }
+      label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 14px; }
+      input, select { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+      input:focus, select:focus { outline: none; border-color: #1976d2; }
+      .hint { font-size: 12px; color: #666; margin-top: 3px; }
+      .loading { font-size: 12px; color: #1976d2; margin-top: 3px; }
+      .buttons { margin-top: 25px; text-align: right; border-top: 1px solid #ddd; padding-top: 15px; }
+      button { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; margin-left: 10px; font-size: 14px; }
+      .btn-cancel { background: #f1f3f4; color: #333; }
+      .btn-cancel:hover { background: #e0e0e0; }
+      .btn-create { background: #4caf50; color: white; }
+      .btn-create:hover { background: #45a049; }
+      .btn-create:disabled { background: #ccc; cursor: not-allowed; }
+    </style>
+  </head>
+  <body>
+    <h2>➕ Создать новую категорию</h2>
+    
+    <div class="field">
+      <label>Название категории *</label>
+      <input type="text" id="title" placeholder="Театральные бинокли" autocomplete="off">
+      <div class="hint">Это название будет использовано для генерации URL</div>
+    </div>
+    
+    <div class="field">
+      <label>Родительская категория</label>
+      <select id="parent">
+        <option value="">🏠 Корневая категория (без родителя)</option>
+      </select>
+      <div id="parentHint" class="loading">⏳ Загрузка категорий...</div>
+    </div>
+    
+    <div class="field">
+      <label>
+        <input type="checkbox" id="openDetail" checked> 
+        Открыть детальный лист сразу после создания
+      </label>
+    </div>
+    
+    <div class="buttons">
+      <button class="btn-cancel" onclick="google.script.host.close()">Отмена</button>
+      <button class="btn-create" id="createBtn" onclick="createCategory()">Создать категорию</button>
+    </div>
+    
+    <script>
+      window.onload = function() {
+        document.getElementById('title').focus();
+        loadParentCategories();
+      };
+      
+      function loadParentCategories() {
+        const hint = document.getElementById('parentHint');
+        hint.textContent = '⏳ Загрузка категорий...';
+        hint.className = 'loading';
+        
+        google.script.run
+          .withSuccessHandler(function(categories) {
+            console.log('Получено категорий:', categories.length);
+            
+            const select = document.getElementById('parent');
+            
+            if (categories.length === 0) {
+              hint.textContent = '⚠️ Категории не найдены';
+              hint.style.color = '#f44336';
+              return;
+            }
+            
+            categories.forEach(cat => {
+              const option = document.createElement('option');
+              option.value = cat.id;
+              
+              // Создаём отступ визуально
+              const indent = '\u00A0\u00A0'.repeat(cat.level);
+              option.textContent = indent + (cat.level > 0 ? '└─ ' : '') + cat.title;
+              
+              select.appendChild(option);
+              
+              console.log('Добавлена:', cat.id, cat.title, 'уровень:', cat.level);
+            });
+            
+            hint.textContent = 'Загружено категорий: ' + categories.length;
+            hint.className = 'hint';
+            hint.style.color = '#4caf50';
+          })
+          .withFailureHandler(function(error) {
+            console.error('Ошибка загрузки категорий:', error);
+            hint.textContent = '❌ Ошибка загрузки: ' + error.message;
+            hint.style.color = '#f44336';
+          })
+          .getCategoriesForParentSelect();
+      }
+      
+      function createCategory() {
+        const title = document.getElementById('title').value.trim();
+        
+        if (!title) {
+          alert('⚠️ Укажите название категории');
+          document.getElementById('title').focus();
+          return;
+        }
+        
+        const btn = document.getElementById('createBtn');
+        btn.disabled = true;
+        btn.textContent = '⏳ Создаю...';
+        
+        const parentValue = document.getElementById('parent').value;
+        const parentId = parentValue === '' ? null : parseInt(parentValue);
+        
+        const data = {
+          title: title,
+          parent_id: parentId,
+          openDetail: document.getElementById('openDetail').checked
+        };
+        
+        console.log('Отправляем данные:', data);
+        
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result.success) {
+              alert('✅ Категория "' + title + '" создана!\n\nID: ' + result.categoryId);
+              google.script.host.close();
+            } else {
+              alert('❌ Ошибка: ' + result.error);
+              btn.disabled = false;
+              btn.textContent = 'Создать категорию';
+            }
+          })
+          .withFailureHandler(function(error) {
+            alert('❌ Ошибка: ' + error.message);
+            btn.disabled = false;
+            btn.textContent = 'Создать категорию';
+          })
+          .createNewCategoryMinimal(data);
+      }
+    </script>
+  </body>
+</html>
