@@ -84,20 +84,21 @@ function createNewCategoryMinimal(data) {
     
     const url = generateUrl(data.title);
     
-    // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: формируем payload без parent_id если он null
+    // Формируем payload - parent_id обязателен всегда
     const collectionData = {
       title: data.title,
       url: url,
       html_title: data.title,
       is_hidden: false
     };
-    
-    // Добавляем parent_id ТОЛЬКО если он указан и не null
+
+    // Всегда добавляем parent_id: либо число, либо null для корневых категорий
     if (data.parent_id && data.parent_id !== null && data.parent_id !== '') {
       collectionData.parent_id = parseInt(data.parent_id);
       console.log('[INFO] Категория с родителем:', collectionData.parent_id);
     } else {
-      console.log('[INFO] Корневая категория (без parent_id в payload)');
+      collectionData.parent_id = null;
+      console.log('[INFO] Корневая категория (parent_id = null)');
     }
     
     const payload = {
