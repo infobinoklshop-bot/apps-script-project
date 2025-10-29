@@ -19,22 +19,13 @@ jobs:
       - name: Install clasp
         run: npm install -g @google/clasp
       
-      - name: Decode and create clasprc
+      - name: Create clasprc.json
         run: |
-          echo "${{ secrets.CLASPRC_BASE64 }}" | base64 -d > ~/.clasprc.json
-          echo "=== clasprc.json content ==="
-          cat ~/.clasprc.json
-          echo "=== end ==="
+          echo "${{ secrets.CLASPRC_BASE64 }}" | base64 --decode > ~/.clasprc.json
       
-      - name: Decode and create clasp.json
+      - name: Create clasp.json
         run: |
-          echo "${{ secrets.CLASP_BASE64 }}" | base64 -d > .clasp.json
-          echo "=== clasp.json content ==="
-          cat .clasp.json
-          echo "=== end ==="
-      
-      - name: Test clasp status
-        run: clasp
+          echo "${{ secrets.CLASP_BASE64 }}" | base64 --decode > .clasp.json
       
       - name: Push to Apps Script
         run: clasp push -f
