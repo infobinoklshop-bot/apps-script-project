@@ -240,8 +240,8 @@ const TAG_TILES_CONFIG = {
   BOTTOM_TILE_LIMIT: { min: 15, max: 30 },     // Нижняя плитка: 15-30 анкоров
 
   // Настройки AI для генерации анкоров
-  AI_PROVIDER: 'claude',  // 'gemini' или 'claude'
-  AI_MODEL: 'claude-3-5-sonnet-20241022',
+  AI_PROVIDER: 'openai',  // 'gemini', 'claude' или 'openai'
+  AI_MODEL: 'gpt-4o-mini',
   AI_TEMPERATURE: 0.7,
   AI_MAX_TOKENS: 4000,
 

@@ -334,19 +334,91 @@ ${categoriesList}
 }
 
 /**
- * Вызывает AI API для генерации анкоров (поддерживает Claude и Gemini)
+ * Вызывает AI API для генерации анкоров (поддерживает OpenAI, Claude и Gemini)
  * @param {string} prompt - Промпт для AI
  * @returns {string} Ответ от AI
  */
 function callAIForGeneration(prompt) {
-  const provider = TAG_TILES_CONFIG.AI_PROVIDER || 'claude';
+  const provider = TAG_TILES_CONFIG.AI_PROVIDER || 'openai';
 
-  if (provider === 'claude') {
+  if (provider === 'openai') {
+    return callOpenAIForGeneration(prompt);
+  } else if (provider === 'claude') {
     return callClaudeAPI(prompt);
   } else if (provider === 'gemini') {
     return callGeminiAPI(prompt);
   } else {
     throw new Error(`Неизвестный AI провайдер: ${provider}`);
+  }
+}
+
+/**
+ * Вызывает OpenAI API для генерации анкоров
+ * Использует настроенный в проекте getOpenAIConfig()
+ * @param {string} prompt - Промпт для AI
+ * @returns {string} Ответ от AI
+ */
+function callOpenAIForGeneration(prompt) {
+  try {
+    // Используем уже настроенную функцию из проекта
+    const config = getOpenAIConfig();
+    const apiKey = config.apiKey;
+
+    if (!apiKey || apiKey.includes('YOUR_')) {
+      throw new Error('OpenAI API ключ не настроен. Добавьте OPENAI_API_KEY в Script Properties.');
+    }
+
+    const url = 'https://api.openai.com/v1/chat/completions';
+
+    const payload = {
+      model: config.model || 'gpt-4o-mini',
+      messages: [{
+        role: 'system',
+        content: 'Ты - эксперт по навигации интернет-магазинов и SEO. Отвечай ТОЛЬКО валидным JSON без дополнительного текста.'
+      }, {
+        role: 'user',
+        content: prompt
+      }],
+      temperature: TAG_TILES_CONFIG.AI_TEMPERATURE,
+      max_tokens: TAG_TILES_CONFIG.AI_MAX_TOKENS
+    };
+
+    const options = {
+      method: 'POST',
+      contentType: 'application/json',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`
+      },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    };
+
+    console.log('[INFO] Отправляем запрос в OpenAI API...');
+
+    const response = UrlFetchApp.fetch(url, options);
+    const statusCode = response.getResponseCode();
+
+    if (statusCode !== 200) {
+      const errorBody = response.getContentText();
+      console.error('[ERROR] OpenAI API ответ:', errorBody);
+      throw new Error(`OpenAI API error: ${statusCode} - ${errorBody}`);
+    }
+
+    const result = JSON.parse(response.getContentText());
+
+    if (!result.choices || !result.choices[0] || !result.choices[0].message) {
+      throw new Error('Неожиданный формат ответа от OpenAI API');
+    }
+
+    const text = result.choices[0].message.content;
+
+    console.log('[INFO] ✅ Получен ответ от OpenAI');
+
+    return text;
+
+  } catch (error) {
+    console.error('[ERROR] Ошибка вызова OpenAI API:', error.message);
+    throw error;
   }
 }
 
