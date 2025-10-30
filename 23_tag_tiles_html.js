@@ -378,3 +378,148 @@ function generateAndApplyTilesForActiveCategory() {
     throw error;
   }
 }
+
+/**
+ * ОБЁРТКА для меню: Генерирует плитки тегов
+ * Вызывается из меню "🤖 AI Генерация" → "🏷️ Создать плитку тегов"
+ */
+function generateTagTilesForActiveCategory() {
+  return generateAndApplyTilesForActiveCategory();
+}
+
+/**
+ * Показывает предпросмотр плиток в диалоговом окне
+ */
+function showTilesPreview() {
+  try {
+    const sheet = SpreadsheetApp.getActiveSheet();
+    const startRow = DETAIL_SHEET_SECTIONS.TAG_TILES_START;
+
+    // Читаем сгенерированный HTML
+    const topHTML = sheet.getRange(startRow + 3, 1, 1, 2).getValue();
+    const bottomHTML = sheet.getRange(startRow + 6, 1, 1, 2).getValue();
+
+    if (!topHTML && !bottomHTML) {
+      SpreadsheetApp.getUi().alert(
+        'Плитки не найдены',
+        'Сначала сгенерируйте плитки через меню:\n🤖 AI Генерация → 🏷️ Создать плитку тегов',
+        SpreadsheetApp.getUi().ButtonSet.OK
+      );
+      return;
+    }
+
+    // Создаем HTML для предпросмотра
+    const previewHTML = `
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 20px;
+      background: #f5f5f5;
+    }
+    .preview-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h2 {
+      margin-top: 0;
+      color: #333;
+    }
+    .section {
+      margin-bottom: 40px;
+      padding: 20px;
+      background: #fafafa;
+      border-radius: 8px;
+    }
+    .section h3 {
+      margin-top: 0;
+      color: #666;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    ${generateTilesCSS()}
+    .buttons {
+      margin-top: 30px;
+      text-align: center;
+    }
+    button {
+      padding: 12px 24px;
+      margin: 0 10px;
+      font-size: 16px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: #667eea;
+      color: white;
+    }
+    .btn-primary:hover {
+      background: #5568d3;
+    }
+    .btn-secondary {
+      background: #e1e4e8;
+      color: #333;
+    }
+    .btn-secondary:hover {
+      background: #d1d5da;
+    }
+  </style>
+</head>
+<body>
+  <div class="preview-container">
+    <h2>🏷️ Предпросмотр плиток тегов</h2>
+
+    ${topHTML ? `
+    <div class="section">
+      <h3>Верхняя плитка (Навигация)</h3>
+      ${topHTML}
+    </div>
+    ` : ''}
+
+    ${bottomHTML ? `
+    <div class="section">
+      <h3>Нижняя плитка (SEO)</h3>
+      ${bottomHTML}
+    </div>
+    ` : ''}
+
+    <div class="buttons">
+      <button class="btn-secondary" onclick="google.script.host.close()">Закрыть</button>
+      <button class="btn-primary" onclick="copyToClipboard()">Скопировать HTML</button>
+    </div>
+  </div>
+
+  <script>
+    function copyToClipboard() {
+      const html = \`${topHTML}\\n\\n${bottomHTML}\`;
+      navigator.clipboard.writeText(html).then(() => {
+        alert('HTML скопирован в буфер обмена!');
+      });
+    }
+  </script>
+</body>
+</html>
+    `.trim();
+
+    // Показываем диалог
+    const htmlOutput = HtmlService.createHtmlOutput(previewHTML)
+      .setWidth(1000)
+      .setHeight(700);
+
+    SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'Предпросмотр плиток тегов');
+
+  } catch (error) {
+    console.error('[ERROR] Ошибка предпросмотра:', error.message);
+    SpreadsheetApp.getUi().alert('Ошибка', 'Не удалось показать предпросмотр: ' + error.message, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}

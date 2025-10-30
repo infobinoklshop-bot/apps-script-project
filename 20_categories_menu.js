@@ -39,7 +39,9 @@ function addFullCategoryMenu(mainMenu) {
     .addSeparator()
     .addItem('🎯 Генерировать SEO', 'generateSEOForActiveCategory')
     .addItem('📄 Генерировать описание', 'generateDescriptionForActiveCategory')
+    .addSeparator()
     .addItem('🏷️ Создать плитку тегов', 'generateTagTilesForActiveCategory')
+    .addItem('👁️ Предпросмотр плитки', 'showTilesPreview')
     .addSeparator()
     .addItem('🎨 Генерировать изображения', 'generateCategoryImagesWithAI');
   
