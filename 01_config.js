@@ -223,6 +223,75 @@ const SEMANTICS_API = {
 };
 
 // ========================================
+// КОНФИГУРАЦИЯ ПЛИТОК ТЕГОВ
+// ========================================
+
+const TAG_TILES_CONFIG = {
+  // Пороги плотности ключевых слов (TF в процентах)
+  DENSITY_THRESHOLDS: {
+    MAIN_KEYWORD: { min: 2.0, max: 4.0 },      // Главный ключевик: 2-4%
+    ADDITIONAL: { min: 1.0, max: 2.0 },        // Дополнительные: 1-2%
+    LSI: { min: 0.5, max: 1.0 },               // LSI слова: 0.5-1%
+    SPAM_THRESHOLD: 5.0                         // Порог переспама: >5%
+  },
+
+  // Лимиты количества анкоров
+  TOP_TILE_LIMIT: { min: 5, max: 8 },          // Верхняя плитка: 5-8 анкоров
+  BOTTOM_TILE_LIMIT: { min: 15, max: 30 },     // Нижняя плитка: 15-30 анкоров
+
+  // Настройки AI для генерации анкоров
+  AI_PROVIDER: 'claude',  // 'gemini' или 'claude'
+  AI_MODEL: 'claude-3-5-sonnet-20241022',
+  AI_TEMPERATURE: 0.7,
+  AI_MAX_TOKENS: 4000,
+
+  // Названия листов
+  SHEET_NAME: 'Плитки тегов',
+  DENSITY_ANALYSIS_SHEET: 'Анализ плотности',
+
+  // HTML классы
+  CSS_CLASSES: {
+    TOP_TILE: 'category-tiles category-tiles--top',
+    BOTTOM_TILE: 'category-tiles category-tiles--bottom',
+    TILE_GRID: 'tiles-grid',
+    TILE: 'tile',
+    TILE_SMALL: 'tile tile--small'
+  }
+};
+
+// Колонки листа "Плитки тегов"
+const TAG_TILES_COLUMNS = {
+  CHECKBOX: 1,          // A - Чекбокс для выбора
+  CATEGORY_ID: 2,       // B - ID категории
+  CATEGORY_NAME: 3,     // C - Название категории
+  POSITION: 4,          // D - Позиция ('Верх' или 'Низ')
+  ANCHOR: 5,            // E - Текст анкора
+  KEYWORDS: 6,          // F - Покрываемые ключевики
+  LINK: 7,              // G - Ссылка на категорию
+  STATUS: 8,            // H - Статус (Создан/Применен/Требует обновления)
+  HTML: 9,              // I - HTML код анкора
+  CREATED_AT: 10,       // J - Дата создания
+  APPLIED_AT: 11        // K - Дата применения
+};
+
+// Колонки листа "Анализ плотности"
+const DENSITY_ANALYSIS_COLUMNS = {
+  CATEGORY_ID: 1,           // A - ID категории
+  CATEGORY_NAME: 2,         // B - Название категории
+  KEYWORD: 3,               // C - Ключевое слово
+  TYPE: 4,                  // D - Тип (Целевой/LSI/Тематика)
+  OCCURRENCES: 5,           // E - Количество вхождений
+  TOTAL_WORDS: 6,           // F - Всего слов на странице
+  TF_PERCENT: 7,            // G - TF в процентах
+  TARGET_MIN: 8,            // H - Целевой минимум
+  TARGET_MAX: 9,            // I - Целевой максимум
+  STATUS: 10,               // J - Статус (Достаточно/Недостаточно/Переспам)
+  USED_IN_TILE: 11,         // K - Использовано в плитке (Да/Нет)
+  ANCHOR_TEXT: 12,          // L - Текст анкора где использовано
+  ANALYZED_AT: 13           // M - Дата анализа
+};
+
+// ========================================
 // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
 // ========================================
 
