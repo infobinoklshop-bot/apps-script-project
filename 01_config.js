@@ -164,8 +164,32 @@ const DETAIL_SHEET_SECTIONS = {
   SEO_DESCRIPTION_CELL: 'B14',
   SEO_H1_CELL: 'B15',
   SEO_KEYWORDS_CELL: 'B16',
-  
-  CURRENT_PRODUCTS_START: 27,
+
+  // ============================================
+  // СЕКЦИЯ ПЛИТОК ТЕГОВ (после SEO, до товаров)
+  // ============================================
+
+  // Таблица ключевых слов для плиток (ручной ввод)
+  TAG_KEYWORDS_START: 18,
+  TAG_KEYWORDS_HEADER_ROW: 19,
+  TAG_KEYWORDS_DATA_START: 20,
+  TAG_KEYWORDS_COLUMNS: {
+    CHECKBOX: 1,           // A: Чекбокс для включения в генерацию
+    KEYWORD: 2,            // B: Ключевое слово
+    TILE_TYPE: 3,          // C: Тип плитки (Верхняя/Нижняя)
+    ANCHOR_TEXT: 4,        // D: Текст анкора
+    CATEGORY_LINK: 5,      // E: URL или ID категории
+    CATEGORY_STATUS: 6,    // F: Статус (Существует/Создать/Не указана)
+    PARENT_CATEGORY: 7     // G: ID родительской категории (для новых)
+  },
+
+  // Сгенерированные плитки (динамическое размещение)
+  // Эти значения рассчитываются функцией getTagTilesPositions()
+  TAG_TILES_UPPER_GENERATED: null,  // Рассчитывается динамически
+  TAG_TILES_LOWER_GENERATED: null,  // Рассчитывается динамически
+
+  // Список товаров (динамическое размещение)
+  CURRENT_PRODUCTS_START: 27,  // УСТАРЕЛО - используйте getProductsStartRow()
   CURRENT_PRODUCTS_COLUMNS: {
     CHECKBOX: 1,
     PRODUCT_ID: 2,
@@ -176,10 +200,9 @@ const DETAIL_SHEET_SECTIONS = {
     BRAND: 7,
     CHARACTERISTICS: 8
   },
-  
+
   PRODUCT_PICKER_START: 100,
-  AI_GENERATION_START: 200,
-  TAG_TILES_START: 300
+  AI_GENERATION_START: 200
 };
 
 // ========================================

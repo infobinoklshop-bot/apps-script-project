@@ -37,10 +37,11 @@ function sendCategoryChangesToInSales() {
     }
     
     console.log('[INFO] Отправка изменений категории', categoryId);
-    
-    // Определяем номер строки начала доп.полей
+
+    // ИСПРАВЛЕНО: Определяем номер строки начала доп.полей динамически
     const products = sheet.getRange('B21').getValue() || 0;
-    const extraFieldsStartRow = 29 + products + 5; // Строка после товаров
+    const productsStartRow = calculateSheetSections(sheet).productsStart;
+    const extraFieldsStartRow = productsStartRow + products + 5; // Строка после товаров
     
     // Читаем ВЕРХНИЕ и НИЖНИЕ теги
     // ПРИОРИТЕТ: сначала пробуем из таблицы, потом из дополнительных полей
@@ -265,7 +266,9 @@ function sendCategoryChangesToInSales() {
  */
 function getProductChangeStats(sheet) {
   try {
-    const startRow = 29;
+    // ИСПРАВЛЕНО: Используем динамическое позиционирование
+    const sections = calculateSheetSections(sheet);
+    const startRow = sections.productsStart;
     const lastRow = sheet.getLastRow();
     
     if (lastRow < startRow) {
@@ -329,8 +332,10 @@ function getDescriptionForInSales(sheet) {
  */
 function getTopTagsFromSheet(sheet, productsCount) {
   try {
-    const extraFieldsCount = countExtraFields(sheet, productsCount); // ИСПРАВЛЕНО!
-    const topTagsStartRow = 29 + productsCount + 5 + 2 + extraFieldsCount + 3 + 1 + 2 + 1;
+    const extraFieldsCount = countExtraFields(sheet, productsCount);
+    // ИСПРАВЛЕНО: Используем динамическое позиционирование
+    const productsStartRow = calculateSheetSections(sheet).productsStart;
+    const topTagsStartRow = productsStartRow + productsCount + 5 + 2 + extraFieldsCount + 3 + 1 + 2 + 1;
     
     const data = sheet.getRange(topTagsStartRow, 1, 10, 2).getValues(); // Колонки A и B
     
@@ -364,8 +369,10 @@ function getTopTagsFromSheet(sheet, productsCount) {
  */
 function getBottomTagsFromSheet(sheet, productsCount) {
   try {
-    const extraFieldsCount = countExtraFields(sheet, productsCount); // ИСПРАВЛЕНО!
-    const topTagsStartRow = 29 + productsCount + 5 + 2 + extraFieldsCount + 3 + 1 + 2 + 1;
+    const extraFieldsCount = countExtraFields(sheet, productsCount);
+    // ИСПРАВЛЕНО: Используем динамическое позиционирование
+    const productsStartRow = calculateSheetSections(sheet).productsStart;
+    const topTagsStartRow = productsStartRow + productsCount + 5 + 2 + extraFieldsCount + 3 + 1 + 2 + 1;
     const bottomTagsStartRow = topTagsStartRow + 10 + 3 + 1 + 2 + 1;
     
     const data = sheet.getRange(bottomTagsStartRow, 1, 10, 2).getValues(); // Колонки A и B
@@ -663,11 +670,10 @@ function findFieldValueId(categoryId, fieldName) {
 function getTopTagsFromTable(sheet, productsCount) {
   try {
     const extraFieldsCount = countExtraFields(sheet, productsCount);
-    
-    // ИСПРАВЛЕНО: Правильный расчет позиции таблицы
-    // 29 (товары начало) + productsCount (товары) + 5 (отступ) + 2 (заголовок доп.полей) + 
-    // extraFieldsCount (сами поля) + 3 (отступ) + 1 (заголовок плитки) + 2 (инструкция) + 1 (заголовки столбцов)
-    const topTagsStartRow = 29 + productsCount + 5 + 2 + extraFieldsCount + 3 + 1 + 2 + 1;
+
+    // ИСПРАВЛЕНО: Используем динамическое позиционирование
+    const productsStartRow = calculateSheetSections(sheet).productsStart;
+    const topTagsStartRow = productsStartRow + productsCount + 5 + 2 + extraFieldsCount + 3 + 1 + 2 + 1;
     
     console.log(`📋 Читаем верхнюю плитку тегов из таблицы (строка ${topTagsStartRow})...`);
     
@@ -704,10 +710,10 @@ function getTopTagsFromTable(sheet, productsCount) {
 function getBottomTagsFromTable(sheet, productsCount) {
   try {
     const extraFieldsCount = countExtraFields(sheet, productsCount);
-    
-    // ИСПРАВЛЕНО: Правильный расчет - после верхней плитки
-    // topTagsStartRow + 10 (строк данных верхней плитки) + 3 (отступ) + 1 (заголовок) + 2 (инструкция) + 1 (заголовки столбцов)
-    const topTagsStartRow = 29 + productsCount + 5 + 2 + extraFieldsCount + 3 + 1 + 2 + 1;
+
+    // ИСПРАВЛЕНО: Используем динамическое позиционирование
+    const productsStartRow = calculateSheetSections(sheet).productsStart;
+    const topTagsStartRow = productsStartRow + productsCount + 5 + 2 + extraFieldsCount + 3 + 1 + 2 + 1;
     const bottomTagsStartRow = topTagsStartRow + 10 + 3 + 1 + 2 + 1;
     
     console.log(`📋 Читаем нижнюю плитку тегов из таблицы (строка ${bottomTagsStartRow})...`);
@@ -743,7 +749,9 @@ function getBottomTagsFromTable(sheet, productsCount) {
  */
 function countExtraFields(sheet, productsCount) {
   try {
-    const extraFieldsStartRow = 29 + productsCount + 5 + 2; // Строка начала данных доп.полей
+    // ИСПРАВЛЕНО: Используем динамическое позиционирование
+    const productsStartRow = calculateSheetSections(sheet).productsStart;
+    const extraFieldsStartRow = productsStartRow + productsCount + 5 + 2; // Строка начала данных доп.полей
     
     let count = 0;
     for (let i = 0; i < 50; i++) {

@@ -9,7 +9,7 @@ Google Apps Script application for managing InSales e-commerce categories with A
 **Core Technologies:**
 - Google Apps Script (server-side JavaScript)
 - InSales API (Basic Auth)
-- OpenAI GPT-4 & Google Gemini (content generation)
+- OpenAI GPT-4 & Claude API (content generation)
 - Google Sheets (UI & data persistence)
 
 ## Development Workflow
@@ -59,10 +59,11 @@ Files use **numeric prefixes** that define load order and functional grouping:
 17_*.js                 - Product management
 18_*.js                 - Position tracking (SERP)
 19_*.js                 - InSales API update functions
-20_*.js                 - Menu structure
+20_*.js                 - Menu structure (762 lines)
 21_*.js                 - Send category changes to InSales (762 lines)
 22_*.js                 - Category creation
-23_*.js                 - Export & tag tiles generation
+23_*.js                 - Tag tiles generation (analyzer, generator, HTML)
+24_*.js                 - Manual tag tiles workflow (ACTIVE)
 ```
 
 **Critical dependencies:** Config (01) must load before all other modules. Core modules (05-12) must load before feature modules (13-23).
@@ -95,16 +96,17 @@ Files use **numeric prefixes** that define load order and functional grouping:
 
 2. **"Категория — [Name]"** - Detail sheets (one per category)
    - B2: Category ID (ALWAYS at this cell)
-   - Rows 12-25: SEO section
-   - Row 29+: Products section
-   - Row 300+: Tag tiles section (TAG_TILES_START)
+   - Rows 12-16: SEO section (Title, Description, H1, Keywords)
+   - Rows 18+: Tag keywords table (manual input)
+   - Rows XX+: Generated tag tiles (upper/lower) - DYNAMIC positioning
+   - Rows ZZ+: Products section - DYNAMIC positioning (shifts after tag tiles)
 
 3. **"Ключевые слова"** - Keywords with frequency, competition, type
 4. **"LSI и тематика"** - LSI words and semantic relationships
 5. **"Плитки тегов"** - Generated tag tiles (new feature in development)
 6. **"Анализ плотности"** - Keyword density analysis results
 
-**IMPORTANT:** Cell references in detail sheets are hardcoded (e.g., B2 for category ID, row 29 for products). Do not modify these locations without updating all references.
+**IMPORTANT:** Cell B2 (category ID) and row 18 (tag keywords start) are hardcoded architectural constraints. Products section and tag tiles use DYNAMIC positioning calculated by `calculateSheetSections()` to avoid conflicts.
 
 ### InSales API Integration
 
@@ -131,16 +133,48 @@ const headers = {
 
 ### AI Integration Patterns
 
-**Two OpenAI Approaches:**
+**Three AI Providers:**
 
-1. **Chat Completions API** ([16_categories_ai_content.js](16_categories_ai_content.js:1)) - For quick SEO generation
-2. **Assistants API** ([09_ai_category_descriptions.js](09_ai_category_descriptions.js:1)) - For complex description workflows
+1. **OpenAI Chat Completions API** ([16_categories_ai_content.js](16_categories_ai_content.js:1))
+   - For quick SEO generation (Title, Description, H1)
+   - Model: `gpt-4o-mini`
+   - Temperature: 0.7
 
-**Gemini API** ([23_tag_tiles_generator.js](23_tag_tiles_generator.js:1)) - For tag tile anchor generation:
-- Model: `gemini-1.5-pro`
-- Temperature: 0.7
-- Expects JSON responses with structured anchor data
-- API key stored in Script Properties as `GEMINI_API_KEY`
+2. **OpenAI Assistants API** ([09_ai_category_descriptions.js](09_ai_category_descriptions.js:1))
+   - For complex description workflows with context
+   - Assistant ID stored in config
+   - Supports rewrite vs. new generation modes
+
+3. **Claude API** ([23_tag_tiles_generator.js](23_tag_tiles_generator.js:1))
+   - For tag tile anchor generation (switched from Gemini)
+   - Expects JSON responses with structured anchor data
+   - API key stored in Script Properties as `CLAUDE_API_KEY`
+   - **Note:** Project switched from Gemini to Claude (commit fa93f2f) for better results
+
+### Dynamic Sheet Positioning Pattern
+
+**Problem:** In early versions, tag tiles were placed at fixed rows (916, 933), causing conflicts when products list grew.
+
+**Solution:** Dynamic positioning system in [24_tag_tiles_manual.js](24_tag_tiles_manual.js:1):
+
+```javascript
+// calculateSheetSections() automatically calculates:
+1. Find last row with tag keywords (row 18+)
+2. Place upper tile after keywords + 3 rows offset
+3. Place lower tile after upper tile + its size
+4. Products section shifts automatically after all tiles
+```
+
+**When adding new sections:**
+- Use `calculateSheetSections()` to get current positions
+- Never hardcode row numbers for dynamic sections
+- Only B2 (category ID) and row 18 (keywords start) are fixed
+
+**Example:**
+```javascript
+const sections = calculateSheetSections(sheet);
+// Returns: { lastKeywordRow, upperTileStart, lowerTileStart, productsStart }
+```
 
 ### Error Handling Pattern
 
@@ -189,28 +223,42 @@ sendCategoryChangesToInSales() [21_category_update.js:1]
   → Update status in main list
 ```
 
-### Tag Tiles Generation (New Feature - IN DEVELOPMENT)
+### Tag Tiles Generation (ACTIVE FEATURE)
 
-**Status:** Density analyzer complete, anchor generator complete, HTML generator pending
+**Two Approaches:**
+
+#### A. Manual Workflow (CURRENT - ACTIVE) - [24_tag_tiles_manual.js](24_tag_tiles_manual.js:1)
+
+**Status:** Fully implemented and in active use
 
 **Workflow:**
-1. **Density Analysis** ([23_tag_tiles_analyzer.js](23_tag_tiles_analyzer.js:1))
-   - Loads category HTML, meta, products from InSales
-   - Calculates TF (Term Frequency): `(occurrences / total_words) * 100`
-   - Compares against thresholds (Main: 2-4%, Additional: 1-2%, LSI: 0.5-1%)
-   - Saves to "Анализ плотности" sheet
+1. **Initialize table** - `initializeTagKeywordsTable()` creates input table at row 18+
+2. **Manual input** - User enters keywords, tile types (Upper/Lower), anchor text, category IDs
+3. **Validate categories** - `validateTagKeywords()` checks if categories exist via InSales API
+4. **Create new categories** - `createCategoriesForTags()` creates missing categories if needed
+5. **Generate HTML** - `generateTilesFromManualData()` creates styled HTML tiles
+6. **Preview** - `showTilesPreviewManual()` shows preview before applying
+7. **Dynamic positioning** - `calculateSheetSections()` automatically calculates positions to avoid conflicts
 
-2. **Anchor Generation** ([23_tag_tiles_generator.js](23_tag_tiles_generator.js:1))
-   - **Upper tile** (5-8 anchors): Navigation to child subcategories
-   - **Lower tile** (15-30 anchors): SEO keywords with insufficient density
-   - Uses Gemini API with structured prompts
-   - Returns JSON with anchor text, target category, keywords covered
+**Key Features:**
+- Full control over keywords and anchor text
+- Choose existing categories or create new ones
+- Dynamic section positioning (no conflicts with products)
+- Preview before applying
+- Integrated with InSales API for category creation
 
-3. **HTML Generation** (PENDING) - Convert anchors to styled HTML tiles
-4. **Review Interface** (PENDING) - Tables in detail sheets for user approval
-5. **Apply to InSales** (PENDING) - Update category descriptions via API
+#### B. Automated Workflow (EXPERIMENTAL) - [23_tag_tiles_*.js](23_tag_tiles_analyzer.js:1)
 
-See [docs/TAG_TILES_WORKFLOW.md](docs/TAG_TILES_WORKFLOW.md:1) for complete specifications.
+**Status:** Analyzer complete, generator complete, integration pending
+
+**Workflow:**
+1. **Density Analysis** - Calculates TF (Term Frequency), identifies keywords needing SEO boost
+2. **AI Anchor Generation** - Uses Claude API to generate natural anchor text
+3. **HTML Generation** - Converts anchors to styled HTML tiles
+
+**Note:** Manual workflow is prioritized due to better control over SEO strategy.
+
+See [COMMANDS.md](COMMANDS.md:1) for detailed manual workflow instructions.
 
 ## Common Development Tasks
 
@@ -259,7 +307,8 @@ if (data.parent_id && data.parent_id !== null && data.parent_id !== '') {
 - Hardcode column indices - always use constants
 - Hardcode sheet names - use `CATEGORY_SHEETS` constants
 - Change cell B2 in detail sheets (category ID reference)
-- Change row 29 (product section start)
+- Change row 18 (tag keywords table start)
+- Manually position products section (use `calculateSheetSections()` for dynamic positioning)
 
 ### Working with AI APIs
 
@@ -268,11 +317,13 @@ if (data.parent_id && data.parent_id !== null && data.parent_id !== '') {
 - Use `response_format: { type: 'json_object' }` for structured responses
 - Handle rate limits with retries
 
-**Gemini:**
-- API key in Script Properties as `GEMINI_API_KEY`
-- Setup docs: [docs/SETUP_GEMINI_API.md](docs/SETUP_GEMINI_API.md:1)
+**Claude:**
+- API key in Script Properties as `CLAUDE_API_KEY`
+- Switched from Gemini to Claude for better anchor generation results
 - Use detailed prompts with JSON schema in prompt text
-- Parse response from `candidates[0].content.parts[0].text`
+- Expects structured JSON responses
+
+**Note:** Old Gemini integration still exists in codebase but Claude is preferred for new development.
 
 ## Important Constraints
 
@@ -293,7 +344,7 @@ if (data.parent_id && data.parent_id !== null && data.parent_id !== '') {
 
 1. **Category parent_id:** NEVER create categories with null parent_id. Always use 9069711 as fallback.
 
-2. **Sheet cell references:** Category ID is ALWAYS at B2 in detail sheets. Products ALWAYS start at row 29. These are architectural constraints.
+2. **Sheet cell references:** Category ID is ALWAYS at B2. Tag keywords table ALWAYS starts at row 18. Products section uses DYNAMIC positioning (calculated by `calculateSheetSections()`).
 
 3. **Hierarchical display:** Main list shows tree structure with indentation. Must preserve visual hierarchy when updating.
 
@@ -344,8 +395,32 @@ if (data.parent_id && data.parent_id !== null && data.parent_id !== '') {
 - [13_categories_search.js](13_categories_search.js:1) - Search UI & detail sheet creation (largest module)
 - [21_category_update.js](21_category_update.js:1) - Main update logic for InSales sync
 - [22_category_create.js](22_category_create.js:1) - Category creation with parent_id handling
+- [24_tag_tiles_manual.js](24_tag_tiles_manual.js:1) - Manual tag tiles workflow (active development)
+- [23_tag_tiles_html.js](23_tag_tiles_html.js:1) - HTML/CSS generation for tag tiles
 
 **InSales Documentation:**
 - Base URL: https://binokl.shop
 - Admin: https://myshop-on665.myinsales.ru/admin2
 - API uses Basic Auth with base64-encoded credentials
+
+## Recent Development History
+
+**Latest Features (commits fe9b1ca - present):**
+- ✅ Manual tag tiles workflow with full control over keywords and categories
+- ✅ Dynamic section positioning (no conflicts with products)
+- ✅ Category creation via InSales API from tag tiles interface
+- ✅ Preview functionality for tag tiles before applying
+- ✅ HTML/CSS generation for styled tag tiles
+
+**Important Fixes:**
+- bc4b8fd: Fixed HTTP 422 error when creating root categories (parent_id now always set)
+- fa93f2f: Switched from Gemini to Claude API for better anchor generation
+
+**In Progress:**
+- Manual tag tiles workflow is ACTIVE and prioritized
+- Automated density analysis exists but not integrated with manual workflow
+- Future: Merge manual control with AI suggestions
+
+**Known Issues:**
+- None critical - manual workflow is stable
+- Automated workflow integration pending based on user feedback

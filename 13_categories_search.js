@@ -634,17 +634,91 @@ function setupDetailedCategorySheet(sheet, categoryData, products) {
     sheet.getRange('A17').setValue('Описание категории:').setFontWeight('bold').setBackground('#f1f3f4');
     sheet.getRange('B17').setValue(categoryData.description || '').setWrap(true);
     sheet.setRowHeight(17, 150);
-    
+
     // ========================================
-    // СЕКЦИЯ 3: СТАТИСТИКА ТОВАРОВ
+    // СЕКЦИЯ 3: ТАБЛИЦА КЛЮЧЕВЫХ СЛОВ ДЛЯ ПЛИТОК (НОВОЕ!)
     // ========================================
-    
-    sheet.getRange('A20').setValue('📊 СТАТИСТИКА ТОВАРОВ')
+
+    const keywordsStartRow = DETAIL_SHEET_SECTIONS.TAG_KEYWORDS_START;
+    const keywordsHeaderRow = DETAIL_SHEET_SECTIONS.TAG_KEYWORDS_HEADER_ROW;
+    const keywordsDataStart = DETAIL_SHEET_SECTIONS.TAG_KEYWORDS_DATA_START;
+
+    // Заголовок секции
+    sheet.getRange(keywordsStartRow, 1, 1, 7)
+      .merge()
+      .setValue('📝 КЛЮЧЕВЫЕ СЛОВА ДЛЯ ПЛИТОК ТЕГОВ (ручной ввод)')
+      .setBackground('#E8F0FE')
+      .setFontWeight('bold')
+      .setFontSize(12);
+
+    // Заголовки столбцов
+    const keywordHeaders = [
+      '☑️',                    // A: Чекбокс
+      'Ключевое слово',        // B
+      'Тип плитки',            // C
+      'Текст анкора',          // D
+      'URL/ID категории',      // E
+      'Статус категории',      // F
+      'ID родителя (новая)'    // G
+    ];
+
+    sheet.getRange(keywordsHeaderRow, 1, 1, keywordHeaders.length).setValues([keywordHeaders]);
+    sheet.getRange(keywordsHeaderRow, 1, 1, keywordHeaders.length)
+      .setBackground('#D0E1F9')
+      .setFontWeight('bold')
+      .setHorizontalAlignment('center');
+
+    // Форматирование столбцов
+    sheet.setColumnWidth(1, 40);   // Чекбокс
+    sheet.setColumnWidth(2, 200);  // Ключевое слово
+    sheet.setColumnWidth(3, 120);  // Тип плитки
+    sheet.setColumnWidth(4, 250);  // Текст анкора
+    sheet.setColumnWidth(5, 150);  // URL/ID категории
+    sheet.setColumnWidth(6, 150);  // Статус категории
+    sheet.setColumnWidth(7, 120);  // ID родителя
+
+    // Добавляем валидацию для столбца "Тип плитки"
+    const cols = DETAIL_SHEET_SECTIONS.TAG_KEYWORDS_COLUMNS;
+    const tileTypeColumn = cols.TILE_TYPE;
+    const tileTypeRange = sheet.getRange(keywordsDataStart, tileTypeColumn, 50, 1);
+    const tileTypeRule = SpreadsheetApp.newDataValidation()
+      .requireValueInList(['Верхняя', 'Нижняя'], true)
+      .setAllowInvalid(false)
+      .build();
+    tileTypeRange.setDataValidation(tileTypeRule);
+
+    // Добавляем чекбоксы в первый столбец
+    const checkboxColumn = cols.CHECKBOX;
+    const checkboxRange = sheet.getRange(keywordsDataStart, checkboxColumn, 50, 1);
+    checkboxRange.insertCheckboxes();
+
+    // Добавляем формулы для автоматической проверки статуса категории (столбец F)
+    const statusColumn = cols.CATEGORY_STATUS;
+    const categoryLinkColumn = cols.CATEGORY_LINK;
+
+    for (let i = 0; i < 50; i++) {
+      const row = keywordsDataStart + i;
+      const linkCell = columnToLetterInternal(categoryLinkColumn) + row;
+      const formula = `=IF(ISBLANK(${linkCell}), "Не указана", "Проверить")`;
+      sheet.getRange(row, statusColumn).setFormula(formula);
+    }
+
+    console.log('✅ Таблица ключевых слов инициализирована');
+
+    // ========================================
+    // СЕКЦИЯ 4: СТАТИСТИКА ТОВАРОВ (обновлена позиция!)
+    // ========================================
+
+    // Статистика товаров теперь начинается после таблицы ключевых слов
+    // Строка 18 (заголовок) + 1 (заголовки столбцов) + 50 (данные) + 3 пустые = строка 72
+    const statsStartRow = keywordsDataStart + 50 + 3;
+
+    sheet.getRange(statsStartRow, 1).setValue('📊 СТАТИСТИКА ТОВАРОВ')
          .setFontWeight('bold')
          .setFontSize(14)
          .setBackground('#ff9800')
          .setFontColor('#ffffff');
-    sheet.getRange('A20:F20').merge();
+    sheet.getRange(statsStartRow, 1, 1, 6).merge();
     
     const inStockCount = products.filter(p => 
       p.variants && p.variants.some(v => v.quantity && v.quantity > 0)
@@ -656,37 +730,41 @@ function setupDetailedCategorySheet(sheet, categoryData, products) {
       ['Нет в наличии:', products.length - inStockCount],
       ['Процент наличия:', products.length > 0 ? Math.round(inStockCount / products.length * 100) + '%' : '0%']
     ];
-    
-    sheet.getRange(21, 1, statsData.length, 2).setValues(statsData);
-    sheet.getRange('A21:A24').setFontWeight('bold').setBackground('#f1f3f4');
-    
+
+    sheet.getRange(statsStartRow + 1, 1, statsData.length, 2).setValues(statsData);
+    sheet.getRange(statsStartRow + 1, 1, statsData.length, 1).setFontWeight('bold').setBackground('#f1f3f4');
+
     // ========================================
-    // СЕКЦИЯ 4: ТЕКУЩИЕ ТОВАРЫ (ИСПРАВЛЕНО!)
+    // СЕКЦИЯ 5: ТЕКУЩИЕ ТОВАРЫ (обновлена позиция!)
     // ========================================
-    
-    sheet.getRange('A27').setValue('🛒 ТЕКУЩИЕ ТОВАРЫ В КАТЕГОРИИ')
+
+    const productsStartRow = statsStartRow + 1 + statsData.length + 2;
+
+    sheet.getRange(productsStartRow, 1).setValue('🛒 ТЕКУЩИЕ ТОВАРЫ В КАТЕГОРИИ')
          .setFontWeight('bold')
          .setFontSize(14)
          .setBackground('#9c27b0')
          .setFontColor('#ffffff');
-    sheet.getRange('A27:F27').merge();  // ИСПРАВЛЕНО: только до F
-    
-const productHeaders = [
+    sheet.getRange(productsStartRow, 1, 1, 6).merge();
+
+    const productHeaders = [
       'Название', 'Артикул', 'Цена', 'В наличии', 'ID', '☑️'
     ];
-    
-    sheet.getRange(28, 1, 1, productHeaders.length).setValues([productHeaders]);
-    sheet.getRange(28, 1, 1, productHeaders.length)
+
+    sheet.getRange(productsStartRow + 1, 1, 1, productHeaders.length).setValues([productHeaders]);
+    sheet.getRange(productsStartRow + 1, 1, 1, productHeaders.length)
          .setFontWeight('bold')
          .setBackground('#e1bee7')
          .setHorizontalAlignment('center');
-    
+
+    const productsDataRow = productsStartRow + 2;
+
     if (products.length > 0) {
       const productRows = products.map(product => {
         const variant = product.variants && product.variants[0];
         const inStock = variant && variant.quantity > 0 ? 'Да' : 'Нет';
         const price = variant ? variant.price : (product.price || '');
-        
+
         return [
           product.title,                // A - Название
           variant ? variant.sku : '',   // B - Артикул
@@ -696,11 +774,11 @@ const productHeaders = [
           false                         // F - Чекбокс
         ];
       });
-      
-      sheet.getRange(29, 1, productRows.length, productRows[0].length).setValues(productRows);
-      sheet.getRange(29, 6, productRows.length, 1).insertCheckboxes();  // Чекбоксы в колонке F
-      sheet.getRange(29, 3, productRows.length, 1).setNumberFormat('#,##0.00 ₽');  // Цена в колонке C
-      
+
+      sheet.getRange(productsDataRow, 1, productRows.length, productRows[0].length).setValues(productRows);
+      sheet.getRange(productsDataRow, 6, productRows.length, 1).insertCheckboxes();  // Чекбоксы в колонке F
+      sheet.getRange(productsDataRow, 3, productRows.length, 1).setNumberFormat('#,##0.00 ₽');  // Цена в колонке C
+
       // Ширина колонок
       sheet.setColumnWidth(1, 450);  // Название
       sheet.setColumnWidth(2, 120);  // Артикул
@@ -709,12 +787,12 @@ const productHeaders = [
       sheet.setColumnWidth(5, 100);  // ID
       sheet.setColumnWidth(6, 40);   // Чекбокс
     }
-    
+
     // ========================================
-    // СЕКЦИЯ 5: ДОПОЛНИТЕЛЬНЫЕ ПОЛЯ КАТЕГОРИИ
+    // СЕКЦИЯ 6: ДОПОЛНИТЕЛЬНЫЕ ПОЛЯ КАТЕГОРИИ (обновлена позиция!)
     // ========================================
 
-    const extraFieldsStartRow = 29 + products.length + 3;
+    const extraFieldsStartRow = productsDataRow + products.length + 3;
 
     sheet.getRange(extraFieldsStartRow, 1).setValue('⚙️ ДОПОЛНИТЕЛЬНЫЕ ПОЛЯ КАТЕГОРИИ')
         .setFontWeight('bold')
@@ -762,9 +840,9 @@ const productHeaders = [
     }
 
     console.log('✅ Показано дополнительных полей:', extraFieldsData.length);
-    
+
     // ========================================
-    // СЕКЦИЯ 6: ПЛИТКА ТЕГОВ - ВЕРХНЯЯ
+    // СЕКЦИЯ 7: ПЛИТКА ТЕГОВ - ВЕРХНЯЯ (существующие + новые)
     // ========================================
 
     const topTagsStartRow = extraFieldsStartRow + 2 + extraFieldsData.length + 3;
@@ -774,98 +852,189 @@ const productHeaders = [
         .setFontSize(14)
         .setBackground('#00bcd4')
         .setFontColor('#ffffff');
-    sheet.getRange(topTagsStartRow, 1, 1, 4).merge();
+    sheet.getRange(topTagsStartRow, 1, 1, 8).merge();
 
     sheet.getRange(topTagsStartRow + 1, 1).setValue('Инструкция:')
         .setFontWeight('bold')
         .setBackground('#e0f7fa');
-    sheet.getRange(topTagsStartRow + 1, 2, 1, 3).merge()
-        .setValue('Эта плитка отображается ПЕРЕД описанием категории. Заполните таблицу, система автоматически конвертирует в HTML.')
+    sheet.getRange(topTagsStartRow + 1, 2, 1, 7).merge()
+        .setValue('Слева - существующие теги из InSales. Справа - новые сгенерированные теги. Сравните и выберите лучший вариант.')
         .setWrap(true)
         .setBackground('#e0f7fa');
 
-    const topTagsHeaders = ['Текст ссылки', 'URL', 'Целевая категория', 'Примечание'];
+    // Заголовки: Существующие теги | Новые теги
+    const topTagsHeaders = [
+      'БЫЛО: Текст ссылки', 'БЫЛО: URL', 'БЫЛО: ☑️ Включить', '',
+      'СТАЛО: Текст анкора', 'СТАЛО: URL', 'СТАЛО: ID категории', 'СТАЛО: Примечание'
+    ];
     sheet.getRange(topTagsStartRow + 3, 1, 1, topTagsHeaders.length).setValues([topTagsHeaders]);
-    sheet.getRange(topTagsStartRow + 3, 1, 1, topTagsHeaders.length)
+    sheet.getRange(topTagsStartRow + 3, 1, 1, 3)
         .setFontWeight('bold')
-        .setBackground('#b2ebf2')
-        .setHorizontalAlignment('center');
+        .setFontFamily('Roboto')
+        .setFontSize(8)
+        .setBackground('#ffccbc')  // Красноватый для старых
+        .setHorizontalAlignment('center')
+        .setVerticalAlignment('top');
+    sheet.getRange(topTagsStartRow + 3, 4, 1, 1)
+        .setBackground('#ffffff');  // Разделитель
+    sheet.getRange(topTagsStartRow + 3, 5, 1, 4)
+        .setFontWeight('bold')
+        .setFontFamily('Roboto')
+        .setFontSize(8)
+        .setBackground('#c8e6c9')  // Зеленоватый для новых
+        .setHorizontalAlignment('center')
+        .setVerticalAlignment('top');
 
-    // ИСПРАВЛЕНО: Читаем HTML из правильного поля через справочник
+    // Загружаем существующие теги из InSales
     const topTagsHTML = getFieldValueByName(categoryData, 'Блок ссылок сверху');
     const topTags = parseTagsFromHTML(topTagsHTML);
 
-    console.log(`📋 Парсинг верхних тегов: найдено ${topTags.length} ссылок`);
+    console.log(`📋 Парсинг верхних тегов: найдено ${topTags.length} существующих ссылок`);
 
     const topTagsData = [];
     for (let i = 0; i < 10; i++) {
       if (i < topTags.length) {
-        topTagsData.push([topTags[i].text, topTags[i].url, '', '']);
+        topTagsData.push([
+          topTags[i].text,   // A: БЫЛО - Текст
+          topTags[i].url,    // B: БЫЛО - URL
+          true,              // C: БЫЛО - Чекбокс (по умолчанию включен)
+          '',                // D: Разделитель
+          '',                // E: СТАЛО - Текст анкора (будет заполнено при генерации)
+          '',                // F: СТАЛО - URL
+          '',                // G: СТАЛО - ID категории
+          ''                 // H: СТАЛО - Примечание
+        ]);
       } else {
-        topTagsData.push(['', '', '', '']);
+        topTagsData.push(['', '', false, '', '', '', '', '']);
       }
     }
 
     sheet.getRange(topTagsStartRow + 4, 1, topTagsData.length, topTagsData[0].length).setValues(topTagsData);
 
+    // Добавляем чекбоксы в колонку C
+    sheet.getRange(topTagsStartRow + 4, 3, topTagsData.length, 1).insertCheckboxes();
+
+    // Форматирование: старые теги - красноватый фон, новые - зеленоватый
+    sheet.getRange(topTagsStartRow + 4, 1, topTagsData.length, 3)
+        .setBackground('#ffebee')
+        .setFontFamily('Roboto')
+        .setFontSize(8)
+        .setVerticalAlignment('top')
+        .setHorizontalAlignment('left');
+    sheet.getRange(topTagsStartRow + 4, 5, topTagsData.length, 4)
+        .setBackground('#e8f5e9')
+        .setFontFamily('Roboto')
+        .setFontSize(8)
+        .setVerticalAlignment('top')
+        .setHorizontalAlignment('left');
+
     // Ширина колонок
-    sheet.setColumnWidth(1, 300);  // Текст ссылки
-    sheet.setColumnWidth(2, 450);  // URL
-    sheet.setColumnWidth(3, 200);  // Целевая категория
-    sheet.setColumnWidth(4, 200);  // Примечание
+    sheet.setColumnWidth(1, 250);  // БЫЛО: Текст
+    sheet.setColumnWidth(2, 300);  // БЫЛО: URL
+    sheet.setColumnWidth(3, 80);   // БЫЛО: Чекбокс
+    sheet.setColumnWidth(4, 30);   // Разделитель
+    sheet.setColumnWidth(5, 250);  // СТАЛО: Текст
+    sheet.setColumnWidth(6, 300);  // СТАЛО: URL
+    sheet.setColumnWidth(7, 120);  // СТАЛО: ID
+    sheet.setColumnWidth(8, 150);  // СТАЛО: Примечание
+
+    // Группировка строк (временно отключена из-за ошибок API)
+    // TODO: Реализовать группировку строк после исправления API
 
     // ========================================
-    // СЕКЦИЯ 7: ПЛИТКА ТЕГОВ - НИЖНЯЯ
+    // СЕКЦИЯ 8: ПЛИТКА ТЕГОВ - НИЖНЯЯ (существующие + новые)
     // ========================================
 
-    const bottomTagsStartRow = topTagsStartRow + 4 + 10 + 3;
+    // Расчет позиции: заголовок + инструкция + пустая + заголовки + 10 строк данных + пустая + HTML (2 строки) + отступ (3)
+    const bottomTagsStartRow = topTagsStartRow + 1 + 1 + 1 + 1 + 10 + 1 + 2 + 3;
 
     sheet.getRange(bottomTagsStartRow, 1).setValue('🏷️ ПЛИТКА ТЕГОВ - НИЖНЯЯ (под описанием категории)')
         .setFontWeight('bold')
         .setFontSize(14)
         .setBackground('#ff5722')
         .setFontColor('#ffffff');
-    sheet.getRange(bottomTagsStartRow, 1, 1, 4).merge();
+    sheet.getRange(bottomTagsStartRow, 1, 1, 8).merge();
 
     sheet.getRange(bottomTagsStartRow + 1, 1).setValue('Инструкция:')
         .setFontWeight('bold')
         .setBackground('#ffe0db');
-    sheet.getRange(bottomTagsStartRow + 1, 2, 1, 3).merge()
-        .setValue('Эта плитка отображается ПОСЛЕ описания категории. Можно добавить вручную.')
+    sheet.getRange(bottomTagsStartRow + 1, 2, 1, 7).merge()
+        .setValue('Слева - существующие теги из InSales. Справа - новые сгенерированные теги. Сравните и выберите лучший вариант.')
         .setWrap(true)
         .setBackground('#ffe0db');
 
-    const bottomTagsHeaders = ['Текст ссылки', 'URL', 'Целевая категория', 'Примечание'];
+    // Заголовки: Существующие теги | Новые теги
+    const bottomTagsHeaders = [
+      'БЫЛО: Текст ссылки', 'БЫЛО: URL', 'БЫЛО: ☑️ Включить', '',
+      'СТАЛО: Текст анкора', 'СТАЛО: URL', 'СТАЛО: ID категории', 'СТАЛО: Примечание'
+    ];
     sheet.getRange(bottomTagsStartRow + 3, 1, 1, bottomTagsHeaders.length).setValues([bottomTagsHeaders]);
-    sheet.getRange(bottomTagsStartRow + 3, 1, 1, bottomTagsHeaders.length)
+    sheet.getRange(bottomTagsStartRow + 3, 1, 1, 3)
         .setFontWeight('bold')
-        .setBackground('#ffccbc')
-        .setHorizontalAlignment('center');
+        .setFontFamily('Roboto')
+        .setFontSize(8)
+        .setBackground('#ffccbc')  // Красноватый для старых
+        .setHorizontalAlignment('center')
+        .setVerticalAlignment('top');
+    sheet.getRange(bottomTagsStartRow + 3, 4, 1, 1)
+        .setBackground('#ffffff');  // Разделитель
+    sheet.getRange(bottomTagsStartRow + 3, 5, 1, 4)
+        .setFontWeight('bold')
+        .setFontFamily('Roboto')
+        .setFontSize(8)
+        .setBackground('#c8e6c9')  // Зеленоватый для новых
+        .setHorizontalAlignment('center')
+        .setVerticalAlignment('top');
 
-    // ИСПРАВЛЕНО: Читаем HTML из правильного поля через справочник
+    // Загружаем существующие теги из InSales
     const bottomTagsHTML = getFieldValueByName(categoryData, 'Блок ссылок');
     const bottomTags = parseTagsFromHTML(bottomTagsHTML);
 
-    console.log(`📋 Парсинг нижних тегов: найдено ${bottomTags.length} ссылок`);
+    console.log(`📋 Парсинг нижних тегов: найдено ${bottomTags.length} существующих ссылок`);
 
     const bottomTagsData = [];
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 30; i++) {  // Нижняя плитка больше - 30 строк
       if (i < bottomTags.length) {
-        bottomTagsData.push([bottomTags[i].text, bottomTags[i].url, '', '']);
+        bottomTagsData.push([
+          bottomTags[i].text,   // A: БЫЛО - Текст
+          bottomTags[i].url,    // B: БЫЛО - URL
+          true,                 // C: БЫЛО - Чекбокс (по умолчанию включен)
+          '',                   // D: Разделитель
+          '',                   // E: СТАЛО - Текст анкора (будет заполнено при генерации)
+          '',                   // F: СТАЛО - URL
+          '',                   // G: СТАЛО - ID категории
+          ''                    // H: СТАЛО - Примечание
+        ]);
       } else {
-        bottomTagsData.push(['', '', '', '']);
+        bottomTagsData.push(['', '', false, '', '', '', '', '']);
       }
     }
 
     sheet.getRange(bottomTagsStartRow + 4, 1, bottomTagsData.length, bottomTagsData[0].length).setValues(bottomTagsData);
 
-    // Ширина колонок (повторяем для нижней таблицы)
-    sheet.setColumnWidth(1, 300);  // Текст ссылки
-    sheet.setColumnWidth(2, 450);  // URL
-    sheet.setColumnWidth(3, 200);  // Целевая категория
-    sheet.setColumnWidth(4, 200);  // Примечание
+    // Добавляем чекбоксы в колонку C
+    sheet.getRange(bottomTagsStartRow + 4, 3, bottomTagsData.length, 1).insertCheckboxes();
 
-    console.log('✅ Детальный лист настроен');
+    // Форматирование: старые теги - красноватый фон, новые - зеленоватый
+    sheet.getRange(bottomTagsStartRow + 4, 1, bottomTagsData.length, 3)
+        .setBackground('#ffebee')
+        .setFontFamily('Roboto')
+        .setFontSize(8)
+        .setVerticalAlignment('top')
+        .setHorizontalAlignment('left');
+    sheet.getRange(bottomTagsStartRow + 4, 5, bottomTagsData.length, 4)
+        .setBackground('#e8f5e9')
+        .setFontFamily('Roboto')
+        .setFontSize(8)
+        .setVerticalAlignment('top')
+        .setHorizontalAlignment('left');
+
+    // Ширина колонок (уже установлены выше, не дублируем)
+
+    // Группировка строк (временно отключена из-за ошибок API)
+    // TODO: Реализовать группировку строк после исправления API
+
+    console.log('✅ Детальный лист настроен с блоками сравнения плиток (было/стало) и чекбоксами');
     
   } catch (error) {
     console.error('❌ Ошибка настройки детального листа:', error);
@@ -986,6 +1155,20 @@ function testCategoryDataFromAPI() {
       .setHeight(700),
     'Диагностика field_values'
   );
+}
+
+/**
+ * Вспомогательная функция: конвертирует номер столбца в букву (1 → A, 2 → B, и т.д.)
+ */
+function columnToLetterInternal(column) {
+  let temp;
+  let letter = '';
+  while (column > 0) {
+    temp = (column - 1) % 26;
+    letter = String.fromCharCode(temp + 65) + letter;
+    column = (column - temp - 1) / 26;
+  }
+  return letter;
 }
 
 /**

@@ -11,16 +11,18 @@ function removeSelectedProductsFromCategory() {
   try {
     const sheet = SpreadsheetApp.getActiveSheet();
     const sheetName = sheet.getName();
-    
+
     if (!sheetName.startsWith('Категория — ')) {
       SpreadsheetApp.getUi().alert('Ошибка', 'Только для детального листа категории', SpreadsheetApp.getUi().ButtonSet.OK);
       return;
     }
-    
+
     const categoryId = sheet.getRange('B2').getValue();
     if (!categoryId) throw new Error('ID категории не найден');
-    
-    const startRow = 29;
+
+    // ИСПРАВЛЕНО: Используем динамическое позиционирование
+    const sections = calculateSheetSections(sheet);
+    const startRow = sections.productsStart;
     const lastRow = sheet.getLastRow();
     
     if (lastRow < startRow) {
@@ -212,7 +214,9 @@ function showAddProductsDialog() {
  */
 function getCurrentCategoryProductIds(sheet) {
   try {
-    const startRow = 29;
+    // ИСПРАВЛЕНО: Используем динамическое позиционирование
+    const sections = calculateSheetSections(sheet);
+    const startRow = sections.productsStart;
     const lastRow = sheet.getLastRow();
     
     if (lastRow < startRow) return [];
@@ -694,29 +698,38 @@ function addProductsToCategory(categoryId, productIds) {
 function appendProductsToDetailSheet(products) {
   try {
     const sheet = SpreadsheetApp.getActiveSheet();
-    const startRow = 29;
-    
+    // ИСПРАВЛЕНО: Используем динамическое позиционирование
+    const sections = calculateSheetSections(sheet);
+    const startRow = sections.productsStart;
+
+    console.log(`[DEBUG appendProducts] calculateSheetSections вернул productsStart = ${startRow}`);
+    console.log(`[DEBUG appendProducts] Последняя строка листа = ${sheet.getLastRow()}`);
+
     // Ищем последнюю строку с товаром (где есть ID в колонке E)
     let nextRow = startRow;
+    let debugRows = [];
     while (sheet.getRange(nextRow, 5).getValue() !== '') {  // Колонка E - ID товара
+      const idValue = sheet.getRange(nextRow, 5).getValue();
+      debugRows.push(`Строка ${nextRow}: ID = ${idValue}`);
       nextRow++;
       if (nextRow > 1000) break; // Защита от бесконечного цикла
     }
-    
+
+    console.log(`[DEBUG appendProducts] Проверенные строки с ID:\n${debugRows.join('\n')}`);
     console.log(`📝 Добавляем ${products.length} товаров начиная со строки ${nextRow}`);
-    
+
     const productRows = products.map(product => {
       const variant = product.variants && product.variants[0];
       const inStock = variant && variant.quantity > 0 ? 'Да' : 'Нет';
       const price = variant ? variant.price : product.price;
-      
+
       let characteristics = '';
       if (product.characteristics && product.characteristics.length > 0) {
         characteristics = product.characteristics.slice(0, 3).map(ch =>
           `${ch.property_title || ''}: ${ch.title || ch.name || ''}`
         ).join(', ');
       }
-      
+
       return [
         product.title,                   // A - Название
         variant ? variant.sku : '',      // B - Артикул
@@ -726,7 +739,13 @@ function appendProductsToDetailSheet(products) {
         false                            // F - Чекбокс
       ];
     });
-    
+
+    // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Вставляем новые строки перед записью данных!
+    // Это гарантирует, что мы не перезапишем существующие блоки (дополнительные поля, плитки тегов и т.д.)
+    console.log(`[DEBUG appendProducts] Вставляем ${productRows.length} новых строк после строки ${nextRow - 1}`);
+    sheet.insertRowsAfter(nextRow - 1, productRows.length);
+
+    // Теперь записываем данные в новые пустые строки
     sheet.getRange(nextRow, 1, productRows.length, productRows[0].length).setValues(productRows);
     sheet.getRange(nextRow, 6, productRows.length, 1).insertCheckboxes();  // F - чекбокс
     sheet.getRange(nextRow, 3, productRows.length, 1).setNumberFormat('#,##0.00 ₽');  // C - цена
@@ -746,41 +765,56 @@ function appendProductsToDetailSheet(products) {
  */
 function updateCategoryStatistics(sheet) {
   try {
-    const startRow = 29;
+    // ИСПРАВЛЕНО: Используем динамическое позиционирование
+    const sections = calculateSheetSections(sheet);
+    const startRow = sections.productsStart;
+    const statsStartRow = sections.statsStart;
     const lastRow = sheet.getLastRow();
-    
-    if (lastRow < startRow) {
-      sheet.getRange('B21').setValue(0);
-      sheet.getRange('B22').setValue(0);
-      sheet.getRange('B23').setValue(0);
-      sheet.getRange('B24').setValue('0%');
+
+    console.log(`[DEBUG updateStats] statsStartRow = ${statsStartRow}, productsStart = ${startRow}`);
+
+    // Если блок статистики не найден, используем старые константы как fallback
+    if (!statsStartRow) {
+      console.log('[DEBUG updateStats] Блок статистики не найден, пропускаем обновление');
       return;
     }
-    
+
+    if (lastRow < startRow) {
+      // Нет товаров - записываем нули
+      sheet.getRange(statsStartRow + 1, 2).setValue(0);      // B74: Всего товаров
+      sheet.getRange(statsStartRow + 2, 2).setValue(0);      // B75: В наличии
+      sheet.getRange(statsStartRow + 3, 2).setValue(0);      // B76: Нет в наличии
+      sheet.getRange(statsStartRow + 4, 2).setValue('0%');   // B77: Процент
+      return;
+    }
+
     const data = sheet.getRange(startRow, 1, lastRow - startRow + 1, 8).getValues();
-    
+
     let totalCount = 0;
     let inStockCount = 0;
-    
+
     for (let i = 0; i < data.length; i++) {
-      const id = data[i][1];
+      const id = data[i][4];  // E - ID товара
       if (!id || id.toString().trim() === '') break;
-      
+
       totalCount++;
-      
-      const inStock = data[i][4];
+
+      const inStock = data[i][3];  // D - В наличии
       if (inStock === 'Да') {
         inStockCount++;
       }
     }
-    
+
     const outOfStockCount = totalCount - inStockCount;
     const percentInStock = totalCount > 0 ? Math.round(inStockCount / totalCount * 100) + '%' : '0%';
-    
-    sheet.getRange('B21').setValue(totalCount);
-    sheet.getRange('B22').setValue(inStockCount);
-    sheet.getRange('B23').setValue(outOfStockCount);
-    sheet.getRange('B24').setValue(percentInStock);
+
+    // Записываем в динамические позиции
+    sheet.getRange(statsStartRow + 1, 2).setValue(totalCount);      // Всего товаров
+    sheet.getRange(statsStartRow + 2, 2).setValue(inStockCount);    // В наличии
+    sheet.getRange(statsStartRow + 3, 2).setValue(outOfStockCount); // Нет в наличии
+    sheet.getRange(statsStartRow + 4, 2).setValue(percentInStock);  // Процент
+
+    console.log(`[DEBUG updateStats] Обновлена статистика: ${totalCount} товаров, ${inStockCount} в наличии`);
     
     console.log(`📊 Статистика обновлена: всего ${totalCount}, в наличии ${inStockCount}`);
     

@@ -14,11 +14,13 @@ function generateTilesHTML(generationResult) {
     console.log('[INFO] 🎨 Начинаем генерацию HTML для плиток...');
 
     // Генерируем HTML для верхней плитки
-    const topHTML = generateTopTileHTML(generationResult.topTile);
+    const topAnchors = generationResult.topTile.anchors || generationResult.topTile;
+    const topHTML = generateTopTileHTML(topAnchors);
     console.log('[INFO] ✅ Верхняя плитка сгенерирована:', topHTML.length, 'символов');
 
     // Генерируем HTML для нижней плитки
-    const bottomHTML = generateBottomTileHTML(generationResult.bottomTile);
+    const bottomAnchors = generationResult.bottomTile.anchors || generationResult.bottomTile;
+    const bottomHTML = generateBottomTileHTML(bottomAnchors);
     console.log('[INFO] ✅ Нижняя плитка сгенерирована:', bottomHTML.length, 'символов');
 
     // Объединяем обе плитки
@@ -40,6 +42,7 @@ function generateTilesHTML(generationResult) {
 
 /**
  * Генерирует HTML для верхней плитки (навигация)
+ * Формат: маркированный список <ul><li> без заголовка
  * @param {Array} anchors - Массив анкоров для верхней плитки
  * @returns {string} HTML код
  */
@@ -48,30 +51,27 @@ function generateTopTileHTML(anchors) {
     return '';
   }
 
-  const cssClasses = TAG_TILES_CONFIG.CSS_CLASSES;
+  // Начало списка
+  let html = `<ul>\n`;
 
-  // Начало контейнера
-  let html = `<div class="${cssClasses.TOP_TILE}">\n`;
-  html += `  <h3 class="tiles-title">Категории</h3>\n`;
-  html += `  <div class="${cssClasses.TILE_GRID}">\n`;
-
-  // Генерируем каждый анкор
+  // Генерируем каждый анкор как элемент списка
   anchors.forEach(anchor => {
     const url = anchor.link || anchor.url || '#';
     const text = anchor.anchor || anchor.text;
+    const title = anchor.title || text; // title для атрибута
 
-    html += `    <a href="${url}" class="${cssClasses.TILE}">${text}</a>\n`;
+    html += `<li><a href="${url}" title="${title}">${text}</a></li>\n`;
   });
 
-  // Закрываем контейнер
-  html += `  </div>\n`;
-  html += `</div>`;
+  // Закрываем список
+  html += `</ul>`;
 
   return html;
 }
 
 /**
  * Генерирует HTML для нижней плитки (SEO)
+ * Формат: маркированный список <ul><li> без заголовка
  * @param {Array} anchors - Массив анкоров для нижней плитки
  * @returns {string} HTML код
  */
@@ -80,24 +80,20 @@ function generateBottomTileHTML(anchors) {
     return '';
   }
 
-  const cssClasses = TAG_TILES_CONFIG.CSS_CLASSES;
+  // Начало списка
+  let html = `<ul>\n`;
 
-  // Начало контейнера
-  let html = `<div class="${cssClasses.BOTTOM_TILE}">\n`;
-  html += `  <h3 class="tiles-title">Популярные товары</h3>\n`;
-  html += `  <div class="${cssClasses.TILE_GRID}">\n`;
-
-  // Генерируем каждый анкор
+  // Генерируем каждый анкор как элемент списка
   anchors.forEach(anchor => {
     const url = anchor.link || anchor.url || '#';
     const text = anchor.anchor || anchor.text;
+    const title = anchor.title || text; // title для атрибута
 
-    html += `    <a href="${url}" class="${cssClasses.TILE_SMALL}">${text}</a>\n`;
+    html += `<li><a href="${url}" title="${title}">${text}</a></li>\n`;
   });
 
-  // Закрываем контейнер
-  html += `  </div>\n`;
-  html += `</div>`;
+  // Закрываем список
+  html += `</ul>`;
 
   return html;
 }
@@ -346,7 +342,14 @@ function generateAndApplyTilesForActiveCategory() {
 
     // 1. Генерируем анкоры через AI
     console.log('[INFO] 🤖 Генерируем анкоры...');
-    const anchorsResult = generateTileAnchors(categoryData.category_id);
+    const categoryId = categoryData.id || categoryData.category_id;
+    console.log('[INFO] Category ID:', categoryId);
+
+    if (!categoryId) {
+      throw new Error('Не удалось получить ID категории из листа');
+    }
+
+    const anchorsResult = generateTileAnchors(categoryId);
 
     // 2. Генерируем HTML
     console.log('[INFO] 🎨 Генерируем HTML...');

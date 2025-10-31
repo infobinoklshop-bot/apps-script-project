@@ -40,12 +40,21 @@ function addFullCategoryMenu(mainMenu) {
     .addItem('🎯 Генерировать SEO', 'generateSEOForActiveCategory')
     .addItem('📄 Генерировать описание', 'generateDescriptionForActiveCategory')
     .addSeparator()
-    .addItem('🏷️ Создать плитку тегов', 'generateTagTilesForActiveCategory')
-    .addItem('👁️ Предпросмотр плитки', 'showTilesPreview')
-    .addSeparator()
     .addItem('🎨 Генерировать изображения', 'generateCategoryImagesWithAI');
-  
+
   categoryMenu.addSubMenu(aiMenu);
+
+  // Плитки тегов (ручное управление)
+  const tilesMenu = SpreadsheetApp.getUi().createMenu('🏷️ Плитки тегов')
+    .addItem('📝 Инициализировать таблицу', 'initializeTagKeywordsTable')
+    .addSeparator()
+    .addItem('✅ Проверить категории', 'validateTagKeywords')
+    .addItem('➕ Создать новые категории', 'createCategoriesForTags')
+    .addSeparator()
+    .addItem('🎨 Сгенерировать плитки', 'generateTilesFromManualData')
+    .addItem('👁️ Предпросмотр плитки', 'showTilesPreviewManual');
+
+  categoryMenu.addSubMenu(tilesMenu);
   
   // НОВОЕ: Отслеживание позиций
   const positionsMenu = SpreadsheetApp.getUi().createMenu('📊 Позиции')
