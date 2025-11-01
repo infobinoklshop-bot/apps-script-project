@@ -39,9 +39,12 @@ function sendCategoryChangesToInSales() {
     console.log('[INFO] Отправка изменений категории', categoryId);
 
     // ИСПРАВЛЕНО: Определяем номер строки начала доп.полей динамически
-    const products = sheet.getRange('B21').getValue() || 0;
+    const productsValue = sheet.getRange('B21').getValue();
+    const products = parseInt(productsValue) || 0; // ВАЖНО: Принудительное преобразование в число!
     const productsStartRow = calculateSheetSections(sheet).productsStart;
     const extraFieldsStartRow = productsStartRow + products + 5; // Строка после товаров
+
+    console.log(`[DEBUG] products: ${products} (type: ${typeof products}), productsStartRow: ${productsStartRow} (type: ${typeof productsStartRow})`);
     
     // Читаем ВЕРХНИЕ и НИЖНИЕ теги
     // ПРИОРИТЕТ: сначала пробуем из таблицы, потом из дополнительных полей
