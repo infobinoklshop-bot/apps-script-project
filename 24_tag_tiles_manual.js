@@ -809,9 +809,26 @@ function saveGeneratedTilesToSheet(sheet, htmlResult, tilesData) {
   // === ВЕРХНЯЯ ПЛИТКА: сохраняем в колонки E-H (СТАЛО) ===
   const upperDataStartRow = upperTileRow + 4; // +4 = заголовок + инструкция + пустая + заголовки столбцов
 
-  // ДИНАМИЧЕСКИЙ РАСЧЕТ: находим сколько строк уже есть в таблице
-  const upperExistingRows = sheet.getRange(upperDataStartRow, 1, 50, 1).getValues().filter(row => row[0] !== '').length;
+  // ДИНАМИЧЕСКИЙ РАСЧЕТ: находим сколько строк данных в блоке верхней плитки
+  // Читаем до тех пор, пока не встретим "HTML код (финальный)" или начало нижней плитки
+  let upperExistingRows = 0;
+  for (let row = upperDataStartRow; row < lowerTileRow; row++) {
+    const cellValue = sheet.getRange(row, 1).getValue();
+    const cellText = cellValue ? cellValue.toString() : '';
+
+    // Если встретили "HTML код" - это конец данных
+    if (cellText.includes('HTML код')) {
+      break;
+    }
+
+    // Если ячейка не пустая - увеличиваем счётчик
+    if (cellText.trim() !== '') {
+      upperExistingRows = row - upperDataStartRow + 1;
+    }
+  }
+
   const upperTotalRows = Math.max(upperExistingRows, tilesData.upper.length, 3); // Минимум 3 строки
+  console.log(`[DEBUG] Верхняя плитка: найдено ${upperExistingRows} заполненных строк, итого ${upperTotalRows}`);
 
   // Очищаем старые данные в колонках E-H (СТАЛО)
   sheet.getRange(upperDataStartRow, 5, upperTotalRows, 4).clearContent();
@@ -845,9 +862,26 @@ function saveGeneratedTilesToSheet(sheet, htmlResult, tilesData) {
   // === НИЖНЯЯ ПЛИТКА: сохраняем в колонки E-H (СТАЛО) ===
   const lowerDataStartRow = lowerTileRow + 4;
 
-  // ДИНАМИЧЕСКИЙ РАСЧЕТ: находим сколько строк уже есть в таблице
-  const lowerExistingRows = sheet.getRange(lowerDataStartRow, 1, 100, 1).getValues().filter(row => row[0] !== '').length;
+  // ДИНАМИЧЕСКИЙ РАСЧЕТ: находим сколько строк данных в блоке нижней плитки
+  // Читаем до тех пор, пока не встретим "HTML код (финальный)"
+  let lowerExistingRows = 0;
+  for (let row = lowerDataStartRow; row < lowerDataStartRow + 100; row++) {
+    const cellValue = sheet.getRange(row, 1).getValue();
+    const cellText = cellValue ? cellValue.toString() : '';
+
+    // Если встретили "HTML код" - это конец данных
+    if (cellText.includes('HTML код')) {
+      break;
+    }
+
+    // Если ячейка не пустая - увеличиваем счётчик
+    if (cellText.trim() !== '') {
+      lowerExistingRows = row - lowerDataStartRow + 1;
+    }
+  }
+
   const lowerTotalRows = Math.max(lowerExistingRows, tilesData.lower.length, 5); // Минимум 5 строк
+  console.log(`[DEBUG] Нижняя плитка: найдено ${lowerExistingRows} заполненных строк, итого ${lowerTotalRows}`);
 
   // Очищаем старые данные в колонках E-H (СТАЛО)
   sheet.getRange(lowerDataStartRow, 5, lowerTotalRows, 4).clearContent();
@@ -888,28 +922,48 @@ function saveGeneratedTilesToSheet(sheet, htmlResult, tilesData) {
   console.log(`[INFO] Финальная верхняя плитка: ${finalUpperAnchors.length} тегов`);
   console.log(`[INFO] Финальная нижняя плитка: ${finalLowerAnchors.length} тегов`);
 
-  // Добавляем финальный HTML код в конец каждого блока - ДИНАМИЧЕСКИ
-  // Верхняя плитка - HTML в строке после данных
-  const upperHTMLRow = upperDataStartRow + upperTotalRows + 1;
-  console.log(`[DEBUG] Записываем HTML верхней плитки в строку ${upperHTMLRow} (после ${upperTotalRows} строк данных)`);
+  // Добавляем финальный HTML код - ИЩЕМ СУЩЕСТВУЮЩИЕ ПОЛЯ ПО ТЕКСТУ
+  // Верхняя плитка - ищем ПЕРВОЕ "HTML код (финальный)" после заголовка верхней плитки, но ДО нижней
+  let upperHTMLRow = null;
+  for (let row = upperTileRow; row < lowerTileRow; row++) {
+    const cellValue = sheet.getRange(row, 1).getValue();
+    if (cellValue && cellValue.toString().includes('HTML код') && cellValue.toString().includes('финальный')) {
+      upperHTMLRow = row;
+      break;
+    }
+  }
 
-  // Обновляем существующее поле (оно было создано в setupDetailedCategorySheet)
-  sheet.getRange(upperHTMLRow, 2, 1, 7)
-    .merge()
-    .setValue(finalUpperHTML)
-    .setWrap(true)
-    .setBackground('#c8e6c9');
+  if (upperHTMLRow) {
+    console.log(`[DEBUG] Записываем HTML верхней плитки в строку ${upperHTMLRow} (найдено поле по тексту)`);
+    sheet.getRange(upperHTMLRow, 2, 1, 7)
+      .merge()
+      .setValue(finalUpperHTML)
+      .setWrap(true)
+      .setBackground('#c8e6c9');
+  } else {
+    console.log('[WARNING] Поле для HTML верхней плитки не найдено');
+  }
 
-  // Нижняя плитка - HTML в строке после данных
-  const lowerHTMLRow = lowerDataStartRow + lowerTotalRows + 1;
-  console.log(`[DEBUG] Записываем HTML нижней плитки в строку ${lowerHTMLRow} (после ${lowerTotalRows} строк данных)`);
+  // Нижняя плитка - ищем "HTML код (финальный)" после заголовка нижней плитки
+  let lowerHTMLRow = null;
+  for (let row = lowerTileRow; row < lowerTileRow + 100; row++) {
+    const cellValue = sheet.getRange(row, 1).getValue();
+    if (cellValue && cellValue.toString().includes('HTML код') && cellValue.toString().includes('финальный')) {
+      lowerHTMLRow = row;
+      break;
+    }
+  }
 
-  // Обновляем существующее поле (оно было создано в setupDetailedCategorySheet)
-  sheet.getRange(lowerHTMLRow, 2, 1, 7)
-    .merge()
-    .setValue(finalLowerHTML)
-    .setWrap(true)
-    .setBackground('#c8e6c9');
+  if (lowerHTMLRow) {
+    console.log(`[DEBUG] Записываем HTML нижней плитки в строку ${lowerHTMLRow} (найдено поле по тексту)`);
+    sheet.getRange(lowerHTMLRow, 2, 1, 7)
+      .merge()
+      .setValue(finalLowerHTML)
+      .setWrap(true)
+      .setBackground('#c8e6c9');
+  } else {
+    console.log('[WARNING] Поле для HTML нижней плитки не найдено');
+  }
 
   console.log('[SUCCESS] ✅ Финальные HTML коды добавлены (старые + новые теги)');
 }
