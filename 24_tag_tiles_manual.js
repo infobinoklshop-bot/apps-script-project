@@ -809,11 +809,15 @@ function saveGeneratedTilesToSheet(sheet, htmlResult, tilesData) {
   // === ВЕРХНЯЯ ПЛИТКА: сохраняем в колонки E-H (СТАЛО) ===
   const upperDataStartRow = upperTileRow + 4; // +4 = заголовок + инструкция + пустая + заголовки столбцов
 
+  // ДИНАМИЧЕСКИЙ РАСЧЕТ: находим сколько строк уже есть в таблице
+  const upperExistingRows = sheet.getRange(upperDataStartRow, 1, 50, 1).getValues().filter(row => row[0] !== '').length;
+  const upperTotalRows = Math.max(upperExistingRows, tilesData.upper.length, 3); // Минимум 3 строки
+
   // Очищаем старые данные в колонках E-H (СТАЛО)
-  sheet.getRange(upperDataStartRow, 5, 10, 4).clearContent();
+  sheet.getRange(upperDataStartRow, 5, upperTotalRows, 4).clearContent();
 
   // Записываем новые данные
-  for (let i = 0; i < Math.min(tilesData.upper.length, 10); i++) {
+  for (let i = 0; i < Math.min(tilesData.upper.length, upperTotalRows); i++) {
     const anchor = tilesData.upper[i];
     const row = upperDataStartRow + i;
 
@@ -825,8 +829,8 @@ function saveGeneratedTilesToSheet(sheet, htmlResult, tilesData) {
     ]]);
   }
 
-  // Читаем старые теги с чекбоксами (колонки A, B, C)
-  const upperOldData = sheet.getRange(upperDataStartRow, 1, 10, 3).getValues();
+  // Читаем старые теги с чекбоксами (колонки A, B, C) - ДИНАМИЧЕСКИ
+  const upperOldData = sheet.getRange(upperDataStartRow, 1, upperTotalRows, 3).getValues();
   const upperOldTagsChecked = upperOldData
     .filter(row => row[2] === true && row[0] && row[1]) // Чекбокс включен и есть данные
     .map(row => ({
@@ -841,11 +845,15 @@ function saveGeneratedTilesToSheet(sheet, htmlResult, tilesData) {
   // === НИЖНЯЯ ПЛИТКА: сохраняем в колонки E-H (СТАЛО) ===
   const lowerDataStartRow = lowerTileRow + 4;
 
+  // ДИНАМИЧЕСКИЙ РАСЧЕТ: находим сколько строк уже есть в таблице
+  const lowerExistingRows = sheet.getRange(lowerDataStartRow, 1, 100, 1).getValues().filter(row => row[0] !== '').length;
+  const lowerTotalRows = Math.max(lowerExistingRows, tilesData.lower.length, 5); // Минимум 5 строк
+
   // Очищаем старые данные в колонках E-H (СТАЛО)
-  sheet.getRange(lowerDataStartRow, 5, 30, 4).clearContent();
+  sheet.getRange(lowerDataStartRow, 5, lowerTotalRows, 4).clearContent();
 
   // Записываем новые данные
-  for (let i = 0; i < Math.min(tilesData.lower.length, 30); i++) {
+  for (let i = 0; i < Math.min(tilesData.lower.length, lowerTotalRows); i++) {
     const anchor = tilesData.lower[i];
     const row = lowerDataStartRow + i;
 
@@ -857,8 +865,8 @@ function saveGeneratedTilesToSheet(sheet, htmlResult, tilesData) {
     ]]);
   }
 
-  // Читаем старые теги с чекбоксами (колонки A, B, C)
-  const lowerOldData = sheet.getRange(lowerDataStartRow, 1, 30, 3).getValues();
+  // Читаем старые теги с чекбоксами (колонки A, B, C) - ДИНАМИЧЕСКИ
+  const lowerOldData = sheet.getRange(lowerDataStartRow, 1, lowerTotalRows, 3).getValues();
   const lowerOldTagsChecked = lowerOldData
     .filter(row => row[2] === true && row[0] && row[1]) // Чекбокс включен и есть данные
     .map(row => ({
@@ -880,10 +888,12 @@ function saveGeneratedTilesToSheet(sheet, htmlResult, tilesData) {
   console.log(`[INFO] Финальная верхняя плитка: ${finalUpperAnchors.length} тегов`);
   console.log(`[INFO] Финальная нижняя плитка: ${finalLowerAnchors.length} тегов`);
 
-  // Добавляем финальный HTML код в конец каждого блока
+  // Добавляем финальный HTML код в конец каждого блока - ДИНАМИЧЕСКИ
   // Верхняя плитка - HTML в строке после данных
-  const upperHTMLRow = upperDataStartRow + 10 + 2;
-  sheet.getRange(upperHTMLRow, 1, 1, 1).setValue('HTML код (финальный):').setFontWeight('bold');
+  const upperHTMLRow = upperDataStartRow + upperTotalRows + 1;
+  console.log(`[DEBUG] Записываем HTML верхней плитки в строку ${upperHTMLRow} (после ${upperTotalRows} строк данных)`);
+
+  // Обновляем существующее поле (оно было создано в setupDetailedCategorySheet)
   sheet.getRange(upperHTMLRow, 2, 1, 7)
     .merge()
     .setValue(finalUpperHTML)
@@ -891,8 +901,10 @@ function saveGeneratedTilesToSheet(sheet, htmlResult, tilesData) {
     .setBackground('#c8e6c9');
 
   // Нижняя плитка - HTML в строке после данных
-  const lowerHTMLRow = lowerDataStartRow + 30 + 2;
-  sheet.getRange(lowerHTMLRow, 1, 1, 1).setValue('HTML код (финальный):').setFontWeight('bold');
+  const lowerHTMLRow = lowerDataStartRow + lowerTotalRows + 1;
+  console.log(`[DEBUG] Записываем HTML нижней плитки в строку ${lowerHTMLRow} (после ${lowerTotalRows} строк данных)`);
+
+  // Обновляем существующее поле (оно было создано в setupDetailedCategorySheet)
   sheet.getRange(lowerHTMLRow, 2, 1, 7)
     .merge()
     .setValue(finalLowerHTML)

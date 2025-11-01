@@ -677,10 +677,15 @@ function setupDetailedCategorySheet(sheet, categoryData, products) {
     sheet.setColumnWidth(6, 150);  // Статус категории
     sheet.setColumnWidth(7, 120);  // ID родителя
 
-    // Добавляем валидацию для столбца "Тип плитки"
+    // ДИНАМИЧЕСКИЙ РАЗМЕР: минимум 5 строк для будущего заполнения
     const cols = DETAIL_SHEET_SECTIONS.TAG_KEYWORDS_COLUMNS;
+    const keywordsRowCount = Math.max(5, 5); // Пока минимум 5, позже можно будет передавать количество ключевых слов
+
+    console.log(`[DEBUG] Создаём таблицу ключевых слов с ${keywordsRowCount} строками`);
+
+    // Добавляем валидацию для столбца "Тип плитки"
     const tileTypeColumn = cols.TILE_TYPE;
-    const tileTypeRange = sheet.getRange(keywordsDataStart, tileTypeColumn, 50, 1);
+    const tileTypeRange = sheet.getRange(keywordsDataStart, tileTypeColumn, keywordsRowCount, 1);
     const tileTypeRule = SpreadsheetApp.newDataValidation()
       .requireValueInList(['Верхняя', 'Нижняя'], true)
       .setAllowInvalid(false)
@@ -689,14 +694,14 @@ function setupDetailedCategorySheet(sheet, categoryData, products) {
 
     // Добавляем чекбоксы в первый столбец
     const checkboxColumn = cols.CHECKBOX;
-    const checkboxRange = sheet.getRange(keywordsDataStart, checkboxColumn, 50, 1);
+    const checkboxRange = sheet.getRange(keywordsDataStart, checkboxColumn, keywordsRowCount, 1);
     checkboxRange.insertCheckboxes();
 
     // Добавляем формулы для автоматической проверки статуса категории (столбец F)
     const statusColumn = cols.CATEGORY_STATUS;
     const categoryLinkColumn = cols.CATEGORY_LINK;
 
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < keywordsRowCount; i++) {
       const row = keywordsDataStart + i;
       const linkCell = columnToLetterInternal(categoryLinkColumn) + row;
       const formula = `=IF(ISBLANK(${linkCell}), "Не указана", "Проверить")`;
@@ -709,9 +714,8 @@ function setupDetailedCategorySheet(sheet, categoryData, products) {
     // СЕКЦИЯ 4: СТАТИСТИКА ТОВАРОВ (обновлена позиция!)
     // ========================================
 
-    // Статистика товаров теперь начинается после таблицы ключевых слов
-    // Строка 18 (заголовок) + 1 (заголовки столбцов) + 50 (данные) + 3 пустые = строка 72
-    const statsStartRow = keywordsDataStart + 50 + 3;
+    // ДИНАМИЧЕСКОЕ ПОЗИЦИОНИРОВАНИЕ: статистика начинается после фактического количества строк ключевых слов
+    const statsStartRow = keywordsDataStart + keywordsRowCount + 3;
 
     sheet.getRange(statsStartRow, 1).setValue('📊 СТАТИСТИКА ТОВАРОВ')
          .setFontWeight('bold')
@@ -891,8 +895,12 @@ function setupDetailedCategorySheet(sheet, categoryData, products) {
 
     console.log(`📋 Парсинг верхних тегов: найдено ${topTags.length} существующих ссылок`);
 
+    // ДИНАМИЧЕСКИЙ РАЗМЕР: минимум 3 строки для будущего заполнения
+    const topTagsRowCount = Math.max(3, topTags.length);
+    console.log(`[DEBUG] Создаём верхнюю плитку с ${topTagsRowCount} строками`);
+
     const topTagsData = [];
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < topTagsRowCount; i++) {
       if (i < topTags.length) {
         topTagsData.push([
           topTags[i].text,   // A: БЫЛО - Текст
@@ -941,12 +949,26 @@ function setupDetailedCategorySheet(sheet, categoryData, products) {
     // Группировка строк (временно отключена из-за ошибок API)
     // TODO: Реализовать группировку строк после исправления API
 
+    // Добавляем поле для финального HTML кода верхней плитки
+    const topHTMLRow = topTagsStartRow + 4 + topTagsRowCount + 1;
+    sheet.getRange(topHTMLRow, 1, 1, 1).setValue('HTML код (финальный):').setFontWeight('bold').setBackground('#f0f0f0');
+    sheet.getRange(topHTMLRow, 2, 1, 7)
+        .merge()
+        .setValue('HTML код будет сгенерирован после создания плиток')
+        .setWrap(true)
+        .setBackground('#e8f5e9')
+        .setFontFamily('Roboto')
+        .setFontSize(9)
+        .setFontColor('#666666');
+
     // ========================================
     // СЕКЦИЯ 8: ПЛИТКА ТЕГОВ - НИЖНЯЯ (существующие + новые)
     // ========================================
 
-    // Расчет позиции: заголовок + инструкция + пустая + заголовки + 10 строк данных + пустая + HTML (2 строки) + отступ (3)
-    const bottomTagsStartRow = topTagsStartRow + 1 + 1 + 1 + 1 + 10 + 1 + 2 + 3;
+    // ДИНАМИЧЕСКИЙ РАСЧЕТ ПОЗИЦИИ для нижней плитки:
+    // Структура верхней плитки: заголовок(1) + инструкция(1) + пустая(1) + заголовки(1) + данные(topTagsRowCount) + пустая(1) + "HTML код (финальный)"(1) + отступ(3)
+    const bottomTagsStartRow = topTagsStartRow + 1 + 1 + 1 + 1 + topTagsRowCount + 1 + 1 + 3;
+    console.log(`[DEBUG] Нижняя плитка начинается со строки ${bottomTagsStartRow} (после ${topTagsRowCount} строк верхней плитки + 1 строка для HTML)`);
 
     sheet.getRange(bottomTagsStartRow, 1).setValue('🏷️ ПЛИТКА ТЕГОВ - НИЖНЯЯ (под описанием категории)')
         .setFontWeight('bold')
@@ -992,8 +1014,12 @@ function setupDetailedCategorySheet(sheet, categoryData, products) {
 
     console.log(`📋 Парсинг нижних тегов: найдено ${bottomTags.length} существующих ссылок`);
 
+    // ДИНАМИЧЕСКИЙ РАЗМЕР: минимум 5 строк для будущего заполнения (нижняя плитка обычно больше)
+    const bottomTagsRowCount = Math.max(5, bottomTags.length);
+    console.log(`[DEBUG] Создаём нижнюю плитку с ${bottomTagsRowCount} строками`);
+
     const bottomTagsData = [];
-    for (let i = 0; i < 30; i++) {  // Нижняя плитка больше - 30 строк
+    for (let i = 0; i < bottomTagsRowCount; i++) {
       if (i < bottomTags.length) {
         bottomTagsData.push([
           bottomTags[i].text,   // A: БЫЛО - Текст
@@ -1033,6 +1059,18 @@ function setupDetailedCategorySheet(sheet, categoryData, products) {
 
     // Группировка строк (временно отключена из-за ошибок API)
     // TODO: Реализовать группировку строк после исправления API
+
+    // Добавляем поле для финального HTML кода нижней плитки
+    const bottomHTMLRow = bottomTagsStartRow + 4 + bottomTagsRowCount + 1;
+    sheet.getRange(bottomHTMLRow, 1, 1, 1).setValue('HTML код (финальный):').setFontWeight('bold').setBackground('#f0f0f0');
+    sheet.getRange(bottomHTMLRow, 2, 1, 7)
+        .merge()
+        .setValue('HTML код будет сгенерирован после создания плиток')
+        .setWrap(true)
+        .setBackground('#e8f5e9')
+        .setFontFamily('Roboto')
+        .setFontSize(9)
+        .setFontColor('#666666');
 
     console.log('✅ Детальный лист настроен с блоками сравнения плиток (было/стало) и чекбоксами');
     
