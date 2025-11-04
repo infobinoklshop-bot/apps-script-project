@@ -218,12 +218,13 @@ function getCurrentCategoryProductIds(sheet) {
     const sections = calculateSheetSections(sheet);
     const startRow = sections.productsStart;
     const lastRow = sheet.getLastRow();
-    
+
     if (lastRow < startRow) return [];
-    
-    const data = sheet.getRange(startRow, 2, lastRow - startRow + 1, 1).getValues();
+
+    // ИСПРАВЛЕНО: ID товара в колонке E (5), а не B (2)!
+    const data = sheet.getRange(startRow, 5, lastRow - startRow + 1, 1).getValues();
     const ids = [];
-    
+
     for (let i = 0; i < data.length; i++) {
       const id = data[i][0];
       if (id && id.toString().trim() !== '') {
@@ -232,10 +233,10 @@ function getCurrentCategoryProductIds(sheet) {
         break;
       }
     }
-    
+
     console.log(`📋 Текущих товаров в категории: ${ids.length}`);
     return ids;
-    
+
   } catch (error) {
     console.error('❌ Ошибка чтения товаров:', error);
     return [];
@@ -243,77 +244,225 @@ function getCurrentCategoryProductIds(sheet) {
 }
 
 /**
- * HTML диалога добавления товаров
+ * HTML диалога добавления товаров (CSV ВЕРСИЯ С ВЫБОРОМ РАЗДЕЛА)
  */
 function createAddProductsDialogHTML(categoryId, categoryTitle, existingIds) {
   const existingIdsJson = JSON.stringify(existingIds);
-  
+
+  // Получаем список импортированных разделов
+  const importedSections = getImportedSections();
+  const sectionsJson = JSON.stringify(importedSections);
+
+  // Получаем конфигурацию основных характеристик для разделов
+  const sectionCharsJson = JSON.stringify(SECTION_CHARACTERISTICS);
+
+  // Если нет импортированных разделов - показываем предупреждение
+  if (importedSections.length === 0) {
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head><base target="_top"></head>
+        <body style="font-family: Arial; padding: 20px;">
+          <h3 style="color: #d32f2f;">⚠️ Нет импортированных разделов</h3>
+          <p>Сначала импортируйте CSV-выгрузку раздела через меню:</p>
+          <p><strong>"📁 Категории" → "📤 Импорт каталога из CSV"</strong></p>
+          <br>
+          <button onclick="google.script.host.close()" style="padding: 10px 20px; background: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer;">
+            Закрыть
+          </button>
+        </body>
+      </html>
+    `;
+  }
+
   return `
     <!DOCTYPE html>
     <html>
       <head>
         <base target="_top">
+        <!-- VERSION: ${Date.now()}-CACHE-BUST -->
         <style>
-          body { font-family: Arial, sans-serif; padding: 20px; margin: 0; }
-          h3 { color: #1976d2; margin-top: 0; }
-          .search-box { margin: 20px 0; }
-          .search-box input {
+          body { font-family: Arial, sans-serif; padding: 15px; margin: 0; background: #f8f9fa; }
+          h3 { color: #1976d2; margin-top: 0; margin-bottom: 15px; }
+
+          .info {
+            background: #e3f2fd;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+            font-size: 13px;
+          }
+
+          /* Секция фильтров */
+          .filters-section {
+            background: white;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+          }
+
+          .filters-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            cursor: pointer;
+          }
+
+          .filters-header h4 {
+            margin: 0;
+            color: #333;
+            font-size: 14px;
+          }
+
+          .toggle-icon {
+            font-size: 18px;
+            transition: transform 0.2s;
+          }
+
+          .toggle-icon.open {
+            transform: rotate(90deg);
+          }
+
+          .filters-content {
+            display: none;
+          }
+
+          .filters-content.open {
+            display: block;
+          }
+
+          .filter-row {
+            margin-bottom: 12px;
+          }
+
+          .filter-label {
+            display: block;
+            font-size: 12px;
+            font-weight: bold;
+            color: #555;
+            margin-bottom: 4px;
+          }
+
+          .filter-input {
             width: 100%;
-            padding: 12px;
-            font-size: 16px;
-            border: 2px solid #ddd;
+            padding: 8px;
+            font-size: 14px;
+            border: 1px solid #ddd;
             border-radius: 4px;
             box-sizing: border-box;
           }
-          .search-box input:focus { outline: none; border-color: #1976d2; }
-          .hint { color: #666; font-size: 13px; margin-top: 8px; }
-          .results {
-            margin: 20px 0;
-            max-height: 380px;
-            overflow-y: auto;
-            border: 1px solid #ddd;
-            border-radius: 4px;
+
+          .filter-input:focus {
+            outline: none;
+            border-color: #1976d2;
           }
-          table { width: 100%; border-collapse: collapse; }
+
+          .checkbox-filter {
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+          }
+
+          .checkbox-filter input {
+            margin-right: 8px;
+          }
+
+          .filter-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 12px;
+          }
+
+          .btn-filter {
+            flex: 1;
+            padding: 8px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+          }
+
+          .btn-apply-filters {
+            background: #1976d2;
+            color: white;
+          }
+
+          .btn-reset-filters {
+            background: #f1f3f4;
+            color: #333;
+          }
+
+          /* Поиск */
+          .search-box {
+            margin-bottom: 15px;
+          }
+
+          .search-box input {
+            width: 100%;
+            padding: 10px;
+            font-size: 15px;
+            border: 2px solid #1976d2;
+            border-radius: 4px;
+            box-sizing: border-box;
+          }
+
+          .search-box input:focus {
+            outline: none;
+            border-color: #1565c0;
+          }
+
+          /* Результаты */
+          .results {
+            background: white;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            max-height: 400px;
+            overflow-y: auto;
+          }
+
+          table {
+            width: 100%;
+            border-collapse: collapse;
+          }
+
           th {
             position: sticky;
             top: 0;
             background: #1976d2;
             color: white;
-            padding: 12px;
+            padding: 10px;
             text-align: left;
-            font-size: 14px;
+            font-size: 13px;
+            z-index: 10;
           }
-          td { padding: 10px 12px; border-bottom: 1px solid #eee; font-size: 14px; }
-          tr:hover { background: #f5f5f5; }
-          .checkbox-cell { width: 40px; text-align: center; }
+
+          td {
+            padding: 8px 10px;
+            border-bottom: 1px solid #eee;
+            font-size: 13px;
+          }
+
+          tr:hover {
+            background: #f5f5f5;
+          }
+
+          .checkbox-cell {
+            width: 40px;
+            text-align: center;
+          }
+
           .stock-yes { color: #4caf50; font-weight: bold; }
           .stock-no { color: #f44336; }
           .in-category { color: #999; font-style: italic; }
-          .actions {
-            margin-top: 20px;
-            text-align: right;
-            padding-top: 15px;
-            border-top: 1px solid #ddd;
+
+          .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
           }
-          button {
-            padding: 10px 20px;
-            margin-left: 10px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-          }
-          .btn-cancel { background: #f1f3f4; color: #333; }
-          .btn-primary { background: #1976d2; color: white; }
-          .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
-          .btn-load-more {
-            background: #4caf50;
-            color: white;
-            width: 100%;
-            margin-top: 10px;
-          }
-          .loading { text-align: center; padding: 40px; color: #666; }
+
           .loading-spinner {
             border: 4px solid #f3f3f3;
             border-top: 4px solid #1976d2;
@@ -323,72 +472,142 @@ function createAddProductsDialogHTML(categoryId, categoryTitle, existingIds) {
             animation: spin 1s linear infinite;
             margin: 20px auto;
           }
+
           @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
           }
-          .info {
-            background: #e3f2fd;
-            padding: 12px;
-            margin-bottom: 15px;
+
+          /* Кнопки действий */
+          .actions {
+            margin-top: 15px;
+            text-align: right;
+            padding-top: 15px;
+            border-top: 1px solid #ddd;
+          }
+
+          button {
+            padding: 10px 20px;
+            margin-left: 10px;
+            border: none;
             border-radius: 4px;
+            cursor: pointer;
             font-size: 14px;
+          }
+
+          .btn-cancel {
+            background: #f1f3f4;
+            color: #333;
+          }
+
+          .btn-primary {
+            background: #1976d2;
+            color: white;
+          }
+
+          .btn-primary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+          }
+
+          .btn-load-more {
+            background: #4caf50;
+            color: white;
+            width: 100%;
+            margin-top: 10px;
           }
         </style>
       </head>
       <body>
         <h3>➕ Добавить товары в категорию</h3>
-        
+
         <div class="info">
-          📁 Категория: <strong>${categoryTitle}</strong><br>
-          📦 Уже в категории: <strong>${existingIds.length}</strong> товаров<br>
-          ✅ Выбрано для добавления: <strong id="selectedCount">0</strong>
+          📁 <strong>${categoryTitle}</strong> |
+          📦 В категории: <strong>${existingIds.length}</strong> |
+          ✅ Выбрано: <strong id="selectedCount">0</strong>
         </div>
-        
+
+        <!-- ВЫБОР РАЗДЕЛА -->
+        <div style="background: white; padding: 15px; margin-bottom: 15px; border-radius: 4px; border: 1px solid #ddd;">
+          <label style="display: block; font-weight: bold; margin-bottom: 8px; font-size: 14px;">
+            📂 Выберите раздел каталога:
+          </label>
+          <select id="sectionSelect" style="width: 100%; padding: 10px; font-size: 14px; border: 1px solid #ddd; border-radius: 4px;">
+            <option value="">-- Выберите раздел --</option>
+          </select>
+        </div>
+
+        <!-- ПОИСК (ПЕРЕНЕСЕНО НАВЕРХ) -->
         <div class="search-box">
-          <input 
-            type="text" 
-            id="searchInput" 
-            placeholder="Начните вводить название товара..."
+          <input
+            type="text"
+            id="searchInput"
+            placeholder="🔍 Поиск по названию или артикулу..."
             autocomplete="off"
           >
-          <div class="hint">
-            💡 Минимум 2 символа. Товары, уже находящиеся в категории, будут помечены серым.
+        </div>
+
+        <!-- ФИЛЬТРЫ -->
+        <div class="filters-section">
+          <div class="filters-header" onclick="toggleFilters()">
+            <h4>🔍 Фильтры по характеристикам</h4>
+            <span class="toggle-icon" id="toggleIcon">▶</span>
+          </div>
+
+          <div class="filters-content" id="filtersContent">
+            <div id="dynamicFilters">
+              <!-- Фильтры будут добавлены динамически -->
+            </div>
+
+            <div class="filter-row">
+              <div class="checkbox-filter">
+                <input type="checkbox" id="filterInStock">
+                <label for="filterInStock">Только товары в наличии</label>
+              </div>
+            </div>
+
+            <div class="filter-actions">
+              <button class="btn-filter btn-apply-filters" onclick="applyFilters()">Применить</button>
+              <button class="btn-filter btn-reset-filters" onclick="resetFilters()">Сбросить</button>
+            </div>
           </div>
         </div>
-        
+
+        <!-- РЕЗУЛЬТАТЫ -->
         <div class="results">
           <table>
             <thead>
               <tr>
                 <th class="checkbox-cell">☑️</th>
                 <th>Название товара</th>
-                <th style="width: 120px;">Наличие</th>
+                <th style="width: 120px;">Админка</th>
+                <th style="width: 100px;">Цена</th>
+                <th style="width: 80px;">Наличие</th>
               </tr>
             </thead>
             <tbody id="resultsBody">
               <tr>
-                <td colspan="3" class="loading">
-                  <div class="loading-spinner"></div>
-                  <strong>Загружаем каталог товаров...</strong><br>
-                  <small>Это может занять до 30 секунд</small>
+                <td colspan="5" class="loading">
+                  <strong>📂 Выберите раздел каталога</strong><br>
+                  <small>Используйте выпадающий список выше</small>
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
-        
+
         <button id="loadMoreBtn" class="btn-load-more" style="display: none;" onclick="loadMoreProducts()">
           📄 Показать ещё 100 товаров
         </button>
-        
+
+        <!-- ДЕЙСТВИЯ -->
         <div class="actions">
           <button class="btn-cancel" onclick="google.script.host.close()">Отмена</button>
           <button id="addBtn" class="btn-primary" onclick="addSelectedProducts()" disabled>
-            ➕ Добавить выбранные (<span id="addBtnCount">0</span>)
+            ➕ Добавить (<span id="addBtnCount">0</span>)
           </button>
         </div>
-        
+
         <script>
           let allProducts = [];
           let filteredProducts = [];
@@ -397,101 +616,299 @@ function createAddProductsDialogHTML(categoryId, categoryTitle, existingIds) {
           let selectedProducts = new Set();
           let searchTimeout;
           const existingIds = new Set(${existingIdsJson});
-          
+          const sections = ${sectionsJson};
+          const sectionCharacteristics = ${sectionCharsJson};
+          let currentMetadata = { characteristics: {} };
+          let activeFilters = {};
+          let selectedSection = '';
+
           window.onload = function() {
-            loadAllProducts();
-            
+            renderSections();
+
+            document.getElementById('sectionSelect').addEventListener('change', function(e) {
+              selectedSection = e.target.value;
+              if (selectedSection) {
+                loadProductsFromSection(selectedSection);
+              } else {
+                allProducts = [];
+                filteredProducts = [];
+                currentMetadata = { characteristics: {} };
+                displayResults();
+                buildDynamicFilters();
+              }
+            });
+
+            // ИСПРАВЛЕНО: Поиск срабатывает сразу при вводе
             document.getElementById('searchInput').addEventListener('input', function(e) {
               clearTimeout(searchTimeout);
-              searchTimeout = setTimeout(() => performSearch(e.target.value), 500);
+              searchTimeout = setTimeout(() => {
+                console.log('🔍 Поиск активирован, значение:', e.target.value);
+                applyFilters();
+              }, 300);
             });
           };
-          
-          function loadAllProducts() {
+
+          function renderSections() {
+            const select = document.getElementById('sectionSelect');
+            sections.forEach(section => {
+              const option = document.createElement('option');
+              option.value = section;
+              option.textContent = section;
+              select.appendChild(option);
+            });
+          }
+
+          function loadProductsFromSection(sectionName) {
+            document.getElementById('resultsBody').innerHTML =
+              '<tr><td colspan="5" class="loading">' +
+              '<div class="loading-spinner"></div>' +
+              '<strong>Загружаем товары из раздела "' + sectionName + '"...</strong>' +
+              '</td></tr>';
+
             google.script.run
-              .withSuccessHandler(function(products) {
-                allProducts = products;
-                document.getElementById('resultsBody').innerHTML = 
-                  '<tr><td colspan="3" class="loading">' +
-                  '✅ Каталог загружен (' + products.length + ' товаров)<br>' +
-                  'Введите текст для поиска' +
-                  '</td></tr>';
+              .withSuccessHandler(function(data) {
+                console.log('📦 Загружено товаров:', data.products.length);
+
+                // ОТЛАДКА КОЛОНКИ КРАТНОСТИ
+                if (data._debug_kratnost) {
+                  console.log('🔍 DEBUG: Колонка "Кратность увеличения, крат"');
+                  console.log('  - Индекс колонки в листе:', data._debug_kratnost.index);
+                  console.log('  - Заголовок колонки:', data._debug_kratnost.header);
+                  console.log('  - Первые 5 значений из ЭТОЙ колонки:', data._debug_kratnost.firstValues);
+                }
+
+                // ВАЖНЫЙ ЛОГ: Показываем ВСЕ характеристики
+                console.log('🔍 ВСЕ ХАРАКТЕРИСТИКИ - ключи:', Object.keys(data.characteristics));
+
+                // Ищем характеристики с подозрительными значениями типа "1##4"
+                for (const [key, values] of Object.entries(data.characteristics)) {
+                  if (values && values.length > 0) {
+                    const firstValue = values[0].toString();
+                    if (firstValue.includes('#' + '#')) {
+                      console.log('🚨 НАЙДЕНА характеристика с "#' + '#": "' + key + '"');
+                      console.log('   Первые 5 значений:', values.slice(0, 5));
+                    }
+                  }
+                }
+
+                const kratnostValues = data.characteristics['Кратность увеличения, крат'];
+                console.log('🔍 КРАТНОСТЬ - массив значений (из метаданных):', kratnostValues);
+                console.log('🔍 КРАТНОСТЬ - первые 5 значений (из метаданных):', kratnostValues ? kratnostValues.slice(0, 5) : 'НЕТ ДАННЫХ');
+
+                allProducts = data.products;
+                filteredProducts = data.products;
+                currentMetadata = { characteristics: data.characteristics };
+                buildDynamicFilters();
+                applyFilters();
               })
               .withFailureHandler(function(error) {
-                document.getElementById('resultsBody').innerHTML = 
-                  '<tr><td colspan="3" class="loading">❌ Ошибка загрузки: ' + error.message + '</td></tr>';
+                console.error('❌ Ошибка загрузки товаров:', error);
+                document.getElementById('resultsBody').innerHTML =
+                  '<tr><td colspan="5" class="loading">' +
+                  '❌ Ошибка: ' + error.message +
+                  '</td></tr>';
               })
-              .getAllProductsForSearch();
+              .getProductsFromCSVSheet(sectionName);
           }
-          
-          function performSearch(query) {
-            if (!query || query.length < 2) {
-              document.getElementById('resultsBody').innerHTML = 
-                '<tr><td colspan="3" class="loading">Введите минимум 2 символа</td></tr>';
-              document.getElementById('loadMoreBtn').style.display = 'none';
-              return;
+
+          function toggleFilters() {
+            const content = document.getElementById('filtersContent');
+            const icon = document.getElementById('toggleIcon');
+            content.classList.toggle('open');
+            icon.classList.toggle('open');
+          }
+
+          function buildDynamicFilters() {
+            const container = document.getElementById('dynamicFilters');
+            const characteristics = currentMetadata.characteristics || {};
+
+            // Получаем список основных характеристик для текущего раздела
+            const mainChars = sectionCharacteristics[selectedSection] || [];
+
+            let html = '';
+
+            // Показываем только основные характеристики в заданном порядке
+            for (const charName of mainChars) {
+              if (characteristics[charName] && characteristics[charName].length > 0) {
+                const values = characteristics[charName];
+                // ИСПРАВЛЕНО: Создаём безопасный ID без специальных символов
+                const safeId = 'filter_' + charName.replace(/[^a-zA-Zа-яА-Я0-9]/g, '_');
+                html += \`
+                  <div class="filter-row">
+                    <label class="filter-label">\${charName}</label>
+                    <select class="filter-input" id="\${safeId}" data-characteristic="\${charName}">
+                      <option value="">Все</option>
+                      \${values.map(v => \`<option value="\${v}">\${v}</option>\`).join('')}
+                    </select>
+                  </div>
+                \`;
+              }
             }
-            
-            const lowerQuery = query.toLowerCase();
-            filteredProducts = allProducts.filter(p => 
-              p.title.toLowerCase().includes(lowerQuery)
-            );
-            
+
+            // Если нет ни одной основной характеристики, показываем все
+            if (html === '') {
+              for (const [key, values] of Object.entries(characteristics)) {
+                if (values && values.length > 0) {
+                  const safeId = 'filter_' + key.replace(/[^a-zA-Zа-яА-Я0-9]/g, '_');
+                  html += \`
+                    <div class="filter-row">
+                      <label class="filter-label">\${key}</label>
+                      <select class="filter-input" id="\${safeId}" data-characteristic="\${key}">
+                        <option value="">Все</option>
+                        \${values.map(v => \`<option value="\${v}">\${v}</option>\`).join('')}
+                      </select>
+                    </div>
+                  \`;
+                }
+              }
+            }
+
+            container.innerHTML = html;
+          }
+
+          // Функция удалена - теперь используется loadProductsFromSection
+
+          function applyFilters() {
+            const searchQuery = document.getElementById('searchInput').value.toLowerCase();
+            const inStockOnly = document.getElementById('filterInStock').checked;
+
+            // Собираем активные фильтры по характеристикам
+            // ИСПРАВЛЕНО: Используем data-attribute для получения имени характеристики
+            activeFilters = {};
+            const filterSelects = document.querySelectorAll('.filter-input[data-characteristic]');
+            filterSelects.forEach(select => {
+              const charName = select.getAttribute('data-characteristic');
+              if (select.value) {
+                activeFilters[charName] = select.value;
+              }
+            });
+
+            console.log('🔍 Применяем фильтры:', {
+              searchQuery,
+              inStockOnly,
+              activeFilters,
+              allProductsCount: allProducts.length
+            });
+
+            // Фильтруем товары
+            let debugCount = 0;
+            filteredProducts = allProducts.filter(product => {
+              // Поиск по названию ИЛИ артикулу
+              if (searchQuery) {
+                // ИСПРАВЛЕНО: title и sku уже строки после getProductsFromCSVSheet
+                const titleMatch = product.title.toLowerCase().includes(searchQuery);
+                const skuMatch = product.sku && product.sku.toLowerCase().includes(searchQuery);
+
+                // Логируем только первые 3 товара для отладки
+                if (debugCount < 3) {
+                  console.log('🔍 Товар:', product.title, '| titleMatch:', titleMatch, '| skuMatch:', skuMatch);
+                  debugCount++;
+                }
+
+                if (!titleMatch && !skuMatch) {
+                  return false;
+                }
+              }
+
+              // Фильтр наличия
+              if (inStockOnly && !product.in_stock) {
+                return false;
+              }
+
+              // Фильтры по характеристикам
+              for (const [key, value] of Object.entries(activeFilters)) {
+                if (!product.characteristics[key] || product.characteristics[key] !== value) {
+                  return false;
+                }
+              }
+
+              return true;
+            });
+
+            console.log(\`✅ Отфильтровано: \${filteredProducts.length} из \${allProducts.length}\`);
+
             displayedCount = 0;
             displayResults();
           }
-          
+
+          function resetFilters() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('filterInStock').checked = false;
+
+            // ИСПРАВЛЕНО: Сбрасываем все select-элементы с data-attribute
+            const filterSelects = document.querySelectorAll('.filter-input[data-characteristic]');
+            filterSelects.forEach(select => {
+              select.value = '';
+            });
+
+            activeFilters = {};
+            applyFilters();
+          }
+
           function displayResults() {
             const tbody = document.getElementById('resultsBody');
-            
+
             if (filteredProducts.length === 0) {
-              tbody.innerHTML = '<tr><td colspan="3" class="loading">😔 Товары не найдены</td></tr>';
+              tbody.innerHTML = '<tr><td colspan="5" class="loading">😔 Товары не найдены<br><small>Попробуйте изменить фильтры</small></td></tr>';
               document.getElementById('loadMoreBtn').style.display = 'none';
               return;
             }
-            
+
             const endIndex = Math.min(displayedCount + batchSize, filteredProducts.length);
             const batch = filteredProducts.slice(displayedCount, endIndex);
-            
-            const html = batch.map(product => {
+
+            const html = batch.map((product, index) => {
+              // ОТЛАДКА: Логируем первый товар для проверки ID
+              if (index === 0) {
+                console.log('🔍 DEBUG первого товара:', {
+                  id: product.id,
+                  title: product.title,
+                  idType: typeof product.id
+                });
+              }
+
               const inCategory = existingIds.has(product.id);
               const rowClass = inCategory ? 'in-category' : '';
-              const checkbox = inCategory ? 
+              const checkbox = inCategory ?
                 '<input type="checkbox" disabled title="Уже в категории">' :
                 \`<input type="checkbox" value="\${product.id}" onchange="toggleProduct(\${product.id})" \${selectedProducts.has(product.id) ? 'checked' : ''}>\`;
-              
-              return \`
-                <tr class="\${rowClass}">
-                  <td class="checkbox-cell">\${checkbox}</td>
-                  <td>\${product.title} \${inCategory ? '(уже в категории)' : ''}</td>
-                  <td class="\${product.in_stock ? 'stock-yes' : 'stock-no'}">
-                    \${product.in_stock ? '✅ Да' : '❌ Нет'}
-                  </td>
-                </tr>
-              \`;
+
+              // ИСПРАВЛЕНО: Ссылка на админку товара вместо характеристик
+              const price = product.price ? product.price.toFixed(0) + ' ₽' : '—';
+              const adminUrl = 'https://binokl.shop/admin2/products/' + product.id;
+
+              return '<tr class="' + rowClass + '">' +
+                '<td class="checkbox-cell">' + checkbox + '</td>' +
+                '<td>' + product.title + (inCategory ? '<small>(уже в категории)</small>' : '') + '</td>' +
+                '<td style="text-align: center;"><a href="' + adminUrl + '" target="_blank" title="Открыть в админке InSales">🔗 Открыть</a></td>' +
+                '<td>' + price + '</td>' +
+                '<td class="' + (product.in_stock ? 'stock-yes' : 'stock-no') + '">' +
+                  (product.in_stock ? '✅' : '❌') +
+                '</td>' +
+              '</tr>';
             }).join('');
-            
+
             if (displayedCount === 0) {
               tbody.innerHTML = html;
             } else {
               tbody.innerHTML += html;
             }
-            
+
             displayedCount = endIndex;
-            
+
             if (displayedCount < filteredProducts.length) {
               document.getElementById('loadMoreBtn').style.display = 'block';
-              document.getElementById('loadMoreBtn').textContent = 
-                \`📄 Показать ещё 100 товаров (осталось \${filteredProducts.length - displayedCount})\`;
+              document.getElementById('loadMoreBtn').textContent =
+                \`📄 Показать ещё 100 (осталось \${filteredProducts.length - displayedCount})\`;
             } else {
               document.getElementById('loadMoreBtn').style.display = 'none';
             }
           }
-          
+
           function loadMoreProducts() {
             displayResults();
           }
-          
+
           function toggleProduct(productId) {
             if (selectedProducts.has(productId)) {
               selectedProducts.delete(productId);
@@ -500,26 +917,26 @@ function createAddProductsDialogHTML(categoryId, categoryTitle, existingIds) {
             }
             updateSelectedCount();
           }
-          
+
           function updateSelectedCount() {
             const count = selectedProducts.size;
             document.getElementById('selectedCount').textContent = count;
             document.getElementById('addBtnCount').textContent = count;
             document.getElementById('addBtn').disabled = count === 0;
           }
-          
+
           function addSelectedProducts() {
             if (selectedProducts.size === 0) {
               alert('Выберите товары');
               return;
             }
-            
+
             const productIds = Array.from(selectedProducts);
             const addBtn = document.getElementById('addBtn');
-            
+
             addBtn.disabled = true;
             addBtn.innerHTML = '⏳ Добавляем...';
-            
+
             google.script.run
               .withSuccessHandler(function(result) {
                 alert(\`✅ Добавлено: \${result.success}\` + (result.errors > 0 ? \`\\n❌ Ошибок: \${result.errors}\` : ''));
@@ -528,7 +945,7 @@ function createAddProductsDialogHTML(categoryId, categoryTitle, existingIds) {
               .withFailureHandler(function(error) {
                 alert('❌ Ошибка: ' + error.message);
                 addBtn.disabled = false;
-                addBtn.innerHTML = '➕ Добавить выбранные (<span id="addBtnCount">' + productIds.length + '</span>)';
+                addBtn.innerHTML = '➕ Добавить (<span id="addBtnCount">' + productIds.length + '</span>)';
               })
               .addProductsToCategory(${categoryId}, productIds);
           }
@@ -616,14 +1033,14 @@ function addProductsToCategory(categoryId, productIds) {
     for (const productId of productIds) {
       try {
         const collectUrl = `${credentials.baseUrl}/admin/collects.json`;
-        
+
         const payload = {
           collect: {
             product_id: productId,
             collection_id: parseInt(categoryId)
           }
         };
-        
+
         console.log(`📦 Добавляем товар ${productId} в категорию ${categoryId}...`);
         
         const response = UrlFetchApp.fetch(collectUrl, {
@@ -641,8 +1058,8 @@ function addProductsToCategory(categoryId, productIds) {
         if (statusCode === 200 || statusCode === 201) {
           console.log(`✅ Товар ${productId} добавлен в категорию`);
           successCount++;
-          
-          // Загружаем данные товара
+
+          // Загружаем данные товара для добавления в таблицу
           try {
             const productUrl = `${credentials.baseUrl}/admin/products/${productId}.json`;
             const productResponse = UrlFetchApp.fetch(productUrl, {
@@ -653,20 +1070,54 @@ function addProductsToCategory(categoryId, productIds) {
               },
               muteHttpExceptions: true
             });
-            
+
             if (productResponse.getResponseCode() === 200) {
-              const product = JSON.parse(productResponse.getContentText());
+              const responseData = JSON.parse(productResponse.getContentText());
+              const product = responseData.product || responseData;
               addedProducts.push(product);
+              console.log(`✅ Данные товара ${productId} загружены для добавления в таблицу`);
             }
           } catch (e) {
-            console.warn(`⚠️ Не удалось загрузить данные товара ${productId}`);
+            console.error(`❌ Ошибка загрузки товара ${productId}:`, e.message);
           }
-          
+
         } else if (statusCode === 422) {
-          console.log(`⚠️ Товар ${productId} уже в категории`);
+          console.log(`⚠️ Товар ${productId} уже в категории InSales`);
           successCount++;
+
+          // Загружаем данные товара для добавления в таблицу
+          try {
+            const productUrl = `${credentials.baseUrl}/admin/products/${productId}.json`;
+            console.log(`[422] Загружаем товар: ${productUrl}`);
+
+            const productResponse = UrlFetchApp.fetch(productUrl, {
+              method: 'GET',
+              headers: {
+                'Authorization': 'Basic ' + Utilities.base64Encode(`${credentials.apiKey}:${credentials.password}`),
+                'Content-Type': 'application/json'
+              },
+              muteHttpExceptions: true
+            });
+
+            const prodStatus = productResponse.getResponseCode();
+            console.log(`[422] Product API код: ${prodStatus}`);
+
+            if (prodStatus === 200) {
+              const responseData = JSON.parse(productResponse.getContentText());
+              console.log(`[422] Response keys: ${Object.keys(responseData).join(', ')}`);
+              const product = responseData.product || responseData;
+              console.log(`[422] Product keys: ${Object.keys(product).join(', ')}`);
+              addedProducts.push(product);
+              console.log(`✅ Данные товара ${productId} загружены для добавления в таблицу (всего: ${addedProducts.length})`);
+            } else {
+              console.error(`[422] ❌ Product API вернул код ${prodStatus}: ${productResponse.getContentText()}`);
+            }
+          } catch (e) {
+            console.error(`❌ Ошибка загрузки товара ${productId}:`, e.message);
+            console.error(`Stack: ${e.stack}`);
+          }
         } else {
-          console.error(`❌ Ошибка добавления товара ${productId}: ${statusCode}`);
+          console.error(`❌ Ошибка добавления товара ${productId}: ${statusCode} - ${response.getContentText()}`);
           errorCount++;
         }
         
@@ -679,11 +1130,16 @@ function addProductsToCategory(categoryId, productIds) {
     }
     
     console.log(`✅ Итого: добавлено ${successCount}, ошибок ${errorCount}`);
-    
+    console.log(`📋 Товаров для добавления в таблицу: ${addedProducts.length}`);
+
     if (addedProducts.length > 0) {
+      console.log('📝 Добавляем товары в таблицу...');
       appendProductsToDetailSheet(addedProducts);
+      console.log('✅ Товары добавлены в таблицу');
+    } else {
+      console.warn('⚠️ Нет товаров для добавления в таблицу (addedProducts пуст)');
     }
-    
+
     return { success: successCount, errors: errorCount };
     
   } catch (error) {
