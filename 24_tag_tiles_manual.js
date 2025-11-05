@@ -165,106 +165,114 @@ function addCategoryPickerLinksToRange(sheet, dataStartRow, rowCount) {
  * @returns {Object} Объект с позициями секций
  */
 function calculateSheetSections(sheet) {
-  // НОВАЯ НАДЁЖНАЯ СИСТЕМА: Ищем секции по заголовкам вместо расчёта отступов
-  const maxRow = Math.min(sheet.getLastRow(), 1000);
+  console.log('[calculateSheetSections] ========== НАЧАЛО РАСЧЁТА ПОЗИЦИЙ ==========');
 
-  let keywordsStart = DETAIL_SHEET_SECTIONS.TAG_KEYWORDS_DATA_START;
-  let keywordsEnd = keywordsStart - 1;
-  let upperTileStart = null;
-  let lowerTileStart = null;
-  let statsStart = null;
-  let productsStart = null;
+  const markers = DETAIL_SHEET_SECTION_MARKERS;
 
-  // Сканируем лист и ищем заголовки секций
-  console.log(`[DEBUG calculateSections] Начинаем сканирование ${maxRow} строк...`);
+  // === ШАГ 1: Находим все заголовки секций по emoji-маркерам ===
+  console.log('[calculateSheetSections] Шаг 1: Поиск заголовков секций...');
 
-  for (let row = 1; row <= maxRow; row++) {
-    const cellValue = sheet.getRange(row, 1).getValue();
-    if (!cellValue) continue;
+  const keywordsRow = findSectionByMarker(sheet, markers.KEYWORDS_HEADER) || markers.KEYWORDS_TABLE_START;
+  const statsRow = findSectionByMarker(sheet, markers.STATS_HEADER);
+  const productsRow = findSectionByMarker(sheet, markers.PRODUCTS_HEADER);
+  const fieldsRow = findSectionByMarker(sheet, markers.FIELDS_HEADER);
+  const upperTileRow = findSectionByMarker(sheet, markers.UPPER_TILE_HEADER);
+  const lowerTileRow = findSectionByMarker(sheet, markers.LOWER_TILE_HEADER);
 
-    const text = cellValue.toString();
+  // === ШАГ 2: Рассчитываем начало данных (заголовок + offset) ===
+  console.log('[calculateSheetSections] Шаг 2: Расчёт начала данных...');
 
-    // Ищем заголовок "КЛЮЧЕВЫЕ СЛОВА ДЛЯ ПЛИТОК"
-    if (text.includes('КЛЮЧЕВЫЕ СЛОВА') && text.includes('ПЛИТК')) {
-      keywordsStart = row + 2; // +2 = заголовок + пустая строка + заголовки столбцов = данные
-      console.log(`[DEBUG calculateSections] Строка ${row}: Найдены КЛЮЧЕВЫЕ СЛОВА`);
-    }
+  const keywordsDataStart = keywordsRow + markers.HEADER_TO_DATA_OFFSET;
+  const productsDataStart = productsRow ? productsRow + markers.HEADER_TO_DATA_OFFSET : null;
 
-    // ДЕБАГ: Логируем все строки с "ПЛИТК"
-    if (text.includes('ПЛИТК')) {
-      console.log(`[DEBUG calculateSections] Строка ${row} содержит ПЛИТК: "${text.substring(0, 50)}..."`);
-      console.log(`[DEBUG] Проверки: ВЕРХН=${text.includes('ВЕРХН')}, 🏷️=${text.includes('🏷️')}, !КЛЮЧЕВ=${!text.includes('КЛЮЧЕВ')}`);
-    }
+  // === ШАГ 3: Находим конец таблицы ключевых слов (динамический поиск) ===
+  console.log('[calculateSheetSections] Шаг 3: Поиск конца таблицы ключевых слов...');
 
-    // Ищем заголовок "ВЕРХНЯЯ ПЛИТКА" (НЕ "ключевые слова")
-    if (text.includes('ВЕРХН') && text.includes('ПЛИТК') && text.includes('🏷️') && !text.includes('КЛЮЧЕВ')) {
-      upperTileStart = row;
-      console.log(`[DEBUG calculateSections] Строка ${row}: Найдена ВЕРХНЯЯ ПЛИТКА`);
-    }
-
-    // Ищем заголовок "НИЖНЯЯ ПЛИТКА" (НЕ "ключевые слова")
-    if (text.includes('НИЖН') && text.includes('ПЛИТК') && text.includes('🏷️') && !text.includes('КЛЮЧЕВ')) {
-      lowerTileStart = row;
-      console.log(`[DEBUG calculateSections] Строка ${row}: Найдена НИЖНЯЯ ПЛИТКА`);
-    }
-
-    // Ищем заголовок "СТАТИСТИКА ТОВАРОВ"
-    if (text.includes('СТАТИСТИКА') && text.includes('ТОВАР')) {
-      statsStart = row;
-      console.log(`[DEBUG calculateSections] Строка ${row}: Найдена СТАТИСТИКА ТОВАРОВ`);
-    }
-
-    // Ищем заголовок "ТОВАРЫ" или "ТЕКУЩИЕ ТОВАРЫ"
-    if ((text.includes('ТОВАР') || text.includes('PRODUCT')) && !text.includes('ПЛИТК') && !text.includes('СТАТИСТИКА')) {
-      productsStart = row + 2; // +2 = заголовок + заголовки столбцов = данные
-      console.log(`[DEBUG calculateSections] Строка ${row}: Найден заголовок ТОВАРЫ (текст: "${text}"), данные с ${productsStart}`);
-      // НЕ ПРЕРЫВАЕМ - нужно найти секции плиток тегов ниже!
-    }
-  }
-
-  // Находим последнюю заполненную строку в таблице ключевых слов
+  let keywordsEnd = keywordsDataStart - 1;
   const keywordColumn = DETAIL_SHEET_SECTIONS.TAG_KEYWORDS_COLUMNS.KEYWORD;
-  for (let row = keywordsStart; row < keywordsStart + 100; row++) {
+
+  // Сканируем до statsRow (если найдена) или до 100 строк
+  const searchLimit = statsRow ? Math.min(statsRow, keywordsDataStart + 100) : keywordsDataStart + 100;
+
+  for (let row = keywordsDataStart; row < searchLimit; row++) {
     const value = sheet.getRange(row, keywordColumn).getValue();
     if (value && value.toString().trim() !== '') {
       keywordsEnd = row;
-    } else if (row > keywordsEnd + 5) {
+    } else if (row > keywordsEnd + 3) {
+      // 3+ пустые строки подряд = конец секции
       break;
     }
   }
 
-  const keywordsCount = keywordsEnd - keywordsStart + 1;
+  const keywordsCount = Math.max(0, keywordsEnd - keywordsDataStart + 1);
+  console.log(`[calculateSheetSections] Таблица ключевых слов: строки ${keywordsDataStart}-${keywordsEnd} (${keywordsCount} записей)`);
 
-  // Fallback значения, если заголовки не найдены
-  if (upperTileStart === null) {
-    upperTileStart = keywordsEnd + 3;
-  }
-  if (lowerTileStart === null) {
-    lowerTileStart = upperTileStart + 12;
-  }
-  if (productsStart === null) {
-    productsStart = lowerTileStart + 37;
+  // === ШАГ 4: Читаем количество товаров из ARCHITECTURAL CONSTANT ===
+  console.log('[calculateSheetSections] Шаг 4: Чтение количества товаров...');
+
+  let productsCount = 0;
+  if (statsRow) {
+    try {
+      // Количество товаров находится в ячейке B{statsRow + 1}
+      const productsCountCell = `B${statsRow + 1}`;
+      const productsValue = sheet.getRange(productsCountCell).getValue();
+      productsCount = parseInt(productsValue) || 0;
+      console.log(`[calculateSheetSections] Количество товаров из ${productsCountCell}: ${productsCount}`);
+    } catch (error) {
+      console.warn(`[calculateSheetSections] ⚠️ Не удалось прочитать количество товаров:`, error.message);
+    }
   }
 
-  console.log(`[DEBUG] Рассчитанные позиции секций:`, {
-    keywordsStart,
+  // === ШАГ 5: Находим HTML-поля плиток по под-маркеру ===
+  console.log('[calculateSheetSections] Шаг 5: Поиск HTML-полей плиток...');
+
+  let upperHTMLRow = null;
+  let lowerHTMLRow = null;
+
+  // Ищем HTML верхней плитки ТОЛЬКО между upperTileRow и lowerTileRow
+  if (upperTileRow && lowerTileRow) {
+    upperHTMLRow = findSectionByMarker(sheet, markers.HTML_CODE_MARKER, upperTileRow, lowerTileRow);
+    console.log(`[calculateSheetSections] Верхняя HTML: строка ${upperHTMLRow || 'не найдена'}`);
+  }
+
+  // Ищем HTML нижней плитки ТОЛЬКО после lowerTileRow
+  if (lowerTileRow) {
+    lowerHTMLRow = findSectionByMarker(sheet, markers.HTML_CODE_MARKER, lowerTileRow, lowerTileRow + 100);
+    console.log(`[calculateSheetSections] Нижняя HTML: строка ${lowerHTMLRow || 'не найдена'}`);
+  }
+
+  // === РЕЗУЛЬТАТ: Объект с позициями всех секций ===
+  const sections = {
+    // Заголовки секций
+    keywordsRow,
+    statsRow,
+    productsRow,
+    fieldsRow,
+    upperTileRow,
+    lowerTileRow,
+
+    // Данные секций
+    keywordsStart: keywordsDataStart,
     keywordsEnd,
     keywordsCount,
-    upperTileStart,
-    lowerTileStart,
-    statsStart,
-    productsStart
-  });
 
-  return {
-    keywordsStart: keywordsStart,
-    keywordsEnd: keywordsEnd,
-    keywordsCount: Math.max(0, keywordsCount),
-    upperTileStart: upperTileStart,
-    lowerTileStart: lowerTileStart,
-    statsStart: statsStart,
-    productsStart: productsStart
+    productsStart: productsDataStart,
+    productsCount,
+
+    // HTML-поля
+    upperHTMLRow,
+    lowerHTMLRow,
+
+    // Метаданные
+    calculatedAt: new Date().toISOString(),
+    method: 'marker-based-v2'
   };
+
+  console.log('[calculateSheetSections] ========== РЕЗУЛЬТАТ ==========');
+  console.log(JSON.stringify(sections, null, 2));
+  console.log('[calculateSheetSections] ========== КОНЕЦ РАСЧЁТА ==========');
+
+  return sections;
 }
 
 /**

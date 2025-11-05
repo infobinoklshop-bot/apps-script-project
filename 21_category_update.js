@@ -688,11 +688,18 @@ function getTopTagsFromTable(sheet, productsCount) {
       return [];
     }
 
-    // Читаем из секции СТАЛО (колонки E-G)
+    // Читаем из секции СТАЛО (колонки E-F)
     const topTagsStartRow = sections.upperTileRow + 4;  // Заголовок + инструкция + пустая + заголовки таблицы
-    const rowsToRead = Math.min(20, sections.upperHTMLRow - topTagsStartRow - 1);  // До HTML-поля
+    const maxRows = sections.upperHTMLRow - topTagsStartRow - 1;  // До HTML-поля
 
-    console.log(`📋 Читаем верхнюю плитку тегов из таблицы (строки ${topTagsStartRow}-${topTagsStartRow + rowsToRead})...`);
+    if (maxRows <= 0) {
+      console.warn('⚠️ Нет данных между заголовком и HTML-полем верхней плитки');
+      return [];
+    }
+
+    const rowsToRead = Math.min(20, maxRows);
+
+    console.log(`📋 Читаем верхнюю плитку тегов из таблицы (строки ${topTagsStartRow}-${topTagsStartRow + rowsToRead - 1})...`);
 
     const data = sheet.getRange(topTagsStartRow, 5, rowsToRead, 2).getValues(); // Колонки E-F (СТАЛО)
     
@@ -736,9 +743,16 @@ function getBottomTagsFromTable(sheet, productsCount) {
 
     // Читаем из секции СТАЛО (колонки E-F)
     const bottomTagsStartRow = sections.lowerTileRow + 4;  // Заголовок + инструкция + пустая + заголовки таблицы
-    const rowsToRead = Math.min(50, sections.lowerHTMLRow - bottomTagsStartRow - 1);  // До HTML-поля
+    const maxRows = sections.lowerHTMLRow - bottomTagsStartRow - 1;  // До HTML-поля
 
-    console.log(`📋 Читаем нижнюю плитку тегов из таблицы (строки ${bottomTagsStartRow}-${bottomTagsStartRow + rowsToRead})...`);
+    if (maxRows <= 0) {
+      console.warn('⚠️ Нет данных между заголовком и HTML-полем нижней плитки');
+      return [];
+    }
+
+    const rowsToRead = Math.min(50, maxRows);
+
+    console.log(`📋 Читаем нижнюю плитку тегов из таблицы (строки ${bottomTagsStartRow}-${bottomTagsStartRow + rowsToRead - 1})...`);
 
     const data = sheet.getRange(bottomTagsStartRow, 5, rowsToRead, 2).getValues(); // Колонки E-F (СТАЛО)
     
