@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+        margin: 0;
+      }
+      h3 {
+        margin-top: 0;
+        color: #1976d2;
+      }
+      .info-box {
+        background: #e3f2fd;
+        border-left: 4px solid #1976d2;
+        padding: 12px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+        font-size: 13px;
+      }
+      .search-container {
+        margin: 20px 0;
+      }
+      .search-field {
+        width: 100%;
+        padding: 12px;
+        margin: 10px 0;
+        border: 2px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+        box-sizing: border-box;
+      }
+      .search-field:focus {
+        outline: none;
+        border-color: #1976d2;
+      }
+      .hint {
+        color: #666;
+        font-size: 12px;
+        margin: 5px 0;
+      }
+      .results {
+        margin: 20px 0;
+        max-height: 350px;
+        overflow-y: auto;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        display: none;
+      }
+      .results.visible {
+        display: block;
+      }
+      .result-item {
+        padding: 12px;
+        border-bottom: 1px solid #eee;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      .result-item:hover {
+        background: #f5f5f5;
+      }
+      .result-item:last-child {
+        border-bottom: none;
+      }
+      .result-title {
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 4px;
+      }
+      .result-path {
+        font-size: 12px;
+        color: #666;
+      }
+      .result-stats {
+        font-size: 11px;
+        color: #999;
+        margin-top: 4px;
+      }
+      .selected-info {
+        background: #f1f8f4;
+        border: 1px solid #4caf50;
+        padding: 12px;
+        margin: 15px 0;
+        border-radius: 4px;
+        display: none;
+      }
+      .selected-info.visible {
+        display: block;
+      }
+      .selected-info-title {
+        font-weight: bold;
+        color: #2e7d32;
+        margin-bottom: 6px;
+      }
+      .selected-info-detail {
+        font-size: 12px;
+        color: #555;
+        line-height: 1.6;
+      }
+      .buttons {
+        margin-top: 20px;
+        text-align: right;
+        border-top: 1px solid #eee;
+        padding-top: 15px;
+      }
+      button {
+        padding: 10px 20px;
+        margin-left: 10px;
+        cursor: pointer;
+        border: none;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+      .btn-cancel {
+        background: #f1f3f4;
+        color: #333;
+      }
+      .btn-cancel:hover {
+        background: #e0e0e0;
+      }
+      .primary {
+        background: #4caf50;
+        color: white;
+      }
+      .primary:hover {
+        background: #45a049;
+      }
+      .primary:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+      .loading {
+        text-align: center;
+        padding: 20px;
+        color: #666;
+      }
+      .no-results {
+        text-align: center;
+        padding: 40px;
+        color: #999;
+      }
+      .selected {
+        background: #e3f2fd !important;
+        border-left: 3px solid #1976d2;
+      }
+    </style>
+  </head>
+  <body>
+    <h3>🔍 Выбрать категорию для плитки</h3>
+
+    <div class="info-box">
+      📝 Строка <strong id="targetRowDisplay"><?= targetRow ?></strong> в таблице ключевых слов
+    </div>
+
+    <div class="search-container">
+      <input
+        type="text"
+        id="searchInput"
+        class="search-field"
+        placeholder="Введите название категории..."
+        autocomplete="off"
+      >
+      <div class="hint">
+        💡 Можно искать по части названия: "бинокли", "10x25", "полевые"
+      </div>
+    </div>
+
+    <div id="results" class="results">
+      <div class="loading">Введите текст для поиска...</div>
+    </div>
+
+    <div id="selectedInfo" class="selected-info">
+      <div class="selected-info-title">✅ Выбрана категория:</div>
+      <div id="selectedInfoContent" class="selected-info-detail"></div>
+    </div>
+
+    <div class="buttons">
+      <button class="btn-cancel" onclick="google.script.host.close()">
+        Отмена
+      </button>
+      <button
+        id="selectBtn"
+        class="primary"
+        onclick="confirmSelection()"
+        disabled
+      >
+        Выбрать категорию
+      </button>
+    </div>
+
+    <script>
+      // Параметры, переданные из серверной части
+      const targetRow = <?= targetRow ?>;
+      const sheetName = "<?= sheetName ?>";
+
+      let allCategories = [];
+      let selectedCategory = null;
+
+      // Загружаем категории при открытии
+      window.onload = function() {
+        loadCategories();
+
+        // Поиск при вводе
+        document.getElementById('searchInput').addEventListener('input', function(e) {
+          performSearch(e.target.value);
+        });
+
+        // Enter для поиска
+        document.getElementById('searchInput').addEventListener('keypress', function(e) {
+          if (e.key === 'Enter') {
+            performSearch(e.target.value);
+          }
+        });
+
+        // Фокус на поле поиска
+        document.getElementById('searchInput').focus();
+      };
+
+      function loadCategories() {
+        google.script.run
+          .withSuccessHandler(function(categories) {
+            allCategories = categories;
+            console.log('Загружено категорий:', categories.length);
+          })
+          .withFailureHandler(function(error) {
+            showError('Ошибка загрузки категорий: ' + error.message);
+          })
+          .getCategoriesForPicker();
+      }
+
+      function performSearch(query) {
+        const resultsDiv = document.getElementById('results');
+        const selectBtn = document.getElementById('selectBtn');
+
+        if (!query || query.length < 2) {
+          resultsDiv.innerHTML = '<div class="loading">Введите минимум 2 символа...</div>';
+          resultsDiv.classList.remove('visible');
+          selectBtn.disabled = true;
+          hideSelectedInfo();
+          return;
+        }
+
+        const searchQuery = query.toLowerCase();
+        const filtered = allCategories.filter(cat =>
+          cat.title.toLowerCase().includes(searchQuery) ||
+          cat.path.toLowerCase().includes(searchQuery) ||
+          cat.id.toString().includes(searchQuery)
+        );
+
+        if (filtered.length === 0) {
+          resultsDiv.innerHTML = '<div class="no-results">😔 Категории не найдены</div>';
+          resultsDiv.classList.add('visible');
+          selectBtn.disabled = true;
+          hideSelectedInfo();
+          return;
+        }
+
+        // Отображаем результаты
+        let html = '';
+        filtered.forEach((cat, index) => {
+          const indent = '&nbsp;&nbsp;'.repeat(cat.level);
+          const prefix = cat.level > 0 ? '└─ ' : '';
+
+          html += `
+            <div class="result-item" onclick="selectCategory(${index})" id="result_${index}">
+              <div class="result-title">
+                ${indent}${prefix}${cat.title}
+              </div>
+              <div class="result-path">📂 ${cat.path}</div>
+              <div class="result-stats">
+                📦 Товаров: ${cat.productsCount} | ✅ В наличии: ${cat.inStockCount} | 🔑 ID: ${cat.id}
+              </div>
+            </div>
+          `;
+        });
+
+        resultsDiv.innerHTML = html;
+        resultsDiv.classList.add('visible');
+
+        // Сохраняем отфильтрованные результаты
+        window.searchResults = filtered;
+      }
+
+      function selectCategory(index) {
+        selectedCategory = window.searchResults[index];
+
+        // Снимаем выделение со всех
+        document.querySelectorAll('.result-item').forEach(item => {
+          item.classList.remove('selected');
+        });
+
+        // Выделяем выбранный
+        document.getElementById('result_' + index).classList.add('selected');
+
+        // Показываем информацию о выбранной категории
+        showSelectedInfo(selectedCategory);
+
+        // Активируем кнопку
+        document.getElementById('selectBtn').disabled = false;
+      }
+
+      function showSelectedInfo(category) {
+        const infoDiv = document.getElementById('selectedInfo');
+        const contentDiv = document.getElementById('selectedInfoContent');
+
+        contentDiv.innerHTML = `
+          <strong>${category.title}</strong><br>
+          📂 Путь: ${category.path}<br>
+          🔑 ID: ${category.id}<br>
+          📦 Товаров: ${category.productsCount} | ✅ В наличии: ${category.inStockCount}
+        `;
+
+        infoDiv.classList.add('visible');
+      }
+
+      function hideSelectedInfo() {
+        document.getElementById('selectedInfo').classList.remove('visible');
+      }
+
+      function confirmSelection() {
+        if (!selectedCategory) {
+          alert('Выберите категорию');
+          return;
+        }
+
+        console.log('Выбрана категория:', selectedCategory);
+        console.log('Для строки:', targetRow, 'в листе:', sheetName);
+
+        // Отключаем кнопку и показываем процесс
+        const selectBtn = document.getElementById('selectBtn');
+        selectBtn.disabled = true;
+        selectBtn.textContent = 'Сохранение...';
+
+        // Отправляем данные на сервер
+        google.script.run
+          .withSuccessHandler(function(result) {
+            console.log('Результат:', result);
+            // Закрываем диалог после успешного сохранения
+            google.script.host.close();
+          })
+          .withFailureHandler(function(error) {
+            alert('Ошибка: ' + error.message);
+            selectBtn.disabled = false;
+            selectBtn.textContent = 'Выбрать категорию';
+          })
+          .selectCategoryForTag(selectedCategory, targetRow, sheetName);
+      }
+
+      function showError(message) {
+        document.getElementById('results').innerHTML =
+          '<div class="no-results">❌ ' + message + '</div>';
+      }
+    </script>
+  </body>
+</html>

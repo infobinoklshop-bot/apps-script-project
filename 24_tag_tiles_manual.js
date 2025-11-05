@@ -16,10 +16,28 @@
 // ============================================
 
 /**
- * Создает таблицу для ручного ввода ключевых слов в детальном листе категории
- * Вызывается автоматически при открытии детального листа или вручную из меню
+ * УСТАРЕЛО: НЕ ИСПОЛЬЗУЙТЕ ЭТУ ФУНКЦИЮ!
+ * Используйте addCategoryPickerColumn() вместо этого.
+ *
+ * Эта функция создавала 50 строк и затирала нижние блоки.
+ * Оставлена для обратной совместимости.
  */
 function initializeTagKeywordsTable() {
+  SpreadsheetApp.getUi().alert(
+    'Эта функция устарела',
+    'Используйте "Добавить кнопки выбора категорий" из меню',
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
+}
+
+/**
+ * Добавляет колонку H "Выбор" с кнопками подбора категорий
+ * к существующей таблице ключевых слов
+ *
+ * ВАЖНО: Таблица ключевых слов должна уже существовать!
+ * (создается автоматически при создании детального листа)
+ */
+function addCategoryPickerColumn() {
   const sheet = SpreadsheetApp.getActiveSheet();
 
   // Проверяем, что это детальный лист категории
@@ -29,76 +47,68 @@ function initializeTagKeywordsTable() {
     return;
   }
 
-  console.log('[INFO] Инициализация таблицы ключевых слов для категории:', categoryId);
+  console.log('[INFO] Добавление колонки выбора категорий для категории:', categoryId);
 
   const startRow = DETAIL_SHEET_SECTIONS.TAG_KEYWORDS_START;
   const headerRow = DETAIL_SHEET_SECTIONS.TAG_KEYWORDS_HEADER_ROW;
+  const dataStartRow = DETAIL_SHEET_SECTIONS.TAG_KEYWORDS_DATA_START;
 
-  // Заголовок секции
-  sheet.getRange(startRow, 1, 1, 7)
+  // Проверяем, есть ли уже колонка H
+  const existingHeader = sheet.getRange(headerRow, 8).getValue();
+  if (existingHeader && existingHeader.includes('Выбор')) {
+    SpreadsheetApp.getUi().alert(
+      'Колонка уже существует',
+      'Колонка "Выбор" уже добавлена к таблице',
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+    return;
+  }
+
+  // Обновляем заголовок секции - расширяем до 8 колонок
+  const sectionHeader = sheet.getRange(startRow, 1).getValue();
+  sheet.getRange(startRow, 1, 1, 8)
     .merge()
-    .setValue('📝 КЛЮЧЕВЫЕ СЛОВА ДЛЯ ПЛИТОК ТЕГОВ (ручной ввод)')
+    .setValue(sectionHeader || '📝 КЛЮЧЕВЫЕ СЛОВА ДЛЯ ПЛИТОК ТЕГОВ (ручной ввод)')
     .setBackground('#E8F0FE')
     .setFontWeight('bold')
     .setFontSize(12);
 
-  // Заголовки столбцов
-  const headers = [
-    '☑️',                    // A: Чекбокс
-    'Ключевое слово',        // B
-    'Тип плитки',            // C
-    'Текст анкора',          // D
-    'URL/ID категории',      // E
-    'Статус категории',      // F
-    'ID родителя (новая)'    // G
-  ];
+  // Добавляем заголовок колонки H
+  sheet.getRange(headerRow, 8)
+    .setValue('Выбор')
+    .setBackground('#D0E1F9')
+    .setFontWeight('bold')
+    .setHorizontalAlignment('center');
 
-  const headerRange = sheet.getRange(headerRow, 1, 1, headers.length);
-  headerRange.setValues([headers]);
-  headerRange.setBackground('#D0E1F9');
-  headerRange.setFontWeight('bold');
-  headerRange.setHorizontalAlignment('center');
+  // Форматирование колонки H
+  sheet.setColumnWidth(8, 100);  // Выбор категории
 
-  // Форматирование столбцов
-  sheet.setColumnWidth(1, 40);   // Чекбокс
-  sheet.setColumnWidth(2, 200);  // Ключевое слово
-  sheet.setColumnWidth(3, 120);  // Тип плитки
-  sheet.setColumnWidth(4, 250);  // Текст анкора
-  sheet.setColumnWidth(5, 150);  // URL/ID категории
-  sheet.setColumnWidth(6, 150);  // Статус категории
-  sheet.setColumnWidth(7, 120);  // ID родителя
-
-  // Добавляем валидацию для столбца "Тип плитки"
-  const dataStartRow = DETAIL_SHEET_SECTIONS.TAG_KEYWORDS_DATA_START;
-  const tileTypeColumn = DETAIL_SHEET_SECTIONS.TAG_KEYWORDS_COLUMNS.TILE_TYPE;
-
-  const tileTypeRange = sheet.getRange(dataStartRow, tileTypeColumn, 50, 1); // 50 строк для ввода
-  const tileTypeRule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(['Верхняя', 'Нижняя'], true)
-    .setAllowInvalid(false)
-    .build();
-  tileTypeRange.setDataValidation(tileTypeRule);
-
-  // Добавляем чекбоксы в первый столбец
-  const checkboxColumn = DETAIL_SHEET_SECTIONS.TAG_KEYWORDS_COLUMNS.CHECKBOX;
-  const checkboxRange = sheet.getRange(dataStartRow, checkboxColumn, 50, 1);
-  checkboxRange.insertCheckboxes();
-
-  // Добавляем формулы для автоматической проверки статуса категории (столбец F)
-  const statusColumn = DETAIL_SHEET_SECTIONS.TAG_KEYWORDS_COLUMNS.CATEGORY_STATUS;
-  const categoryLinkColumn = DETAIL_SHEET_SECTIONS.TAG_KEYWORDS_COLUMNS.CATEGORY_LINK;
-
-  for (let i = 0; i < 50; i++) {
+  // Определяем количество строк в таблице
+  // Ищем первую пустую строку или строку со следующей секцией
+  let rowCount = 0;
+  for (let i = 0; i < 100; i++) { // Максимум 100 строк
     const row = dataStartRow + i;
-    const linkCell = columnToLetter(categoryLinkColumn) + row;
+    const cellValue = sheet.getRange(row, 1).getValue();
 
-    // Формула: если ячейка пустая - "Не указана", иначе будет обновлено скриптом
-    const formula = `=IF(ISBLANK(${linkCell}), "Не указана", "Проверить")`;
-    sheet.getRange(row, statusColumn).setFormula(formula);
+    // Если встретили заголовок следующей секции - останавливаемся
+    if (cellValue && cellValue.toString().includes('📊')) {
+      break;
+    }
+
+    rowCount++;
   }
 
-  console.log('[SUCCESS] ✅ Таблица ключевых слов инициализирована');
-  SpreadsheetApp.getActiveSpreadsheet().toast('Таблица готова к заполнению', '✅ Успех', 3);
+  console.log(`[INFO] Найдено ${rowCount} строк в таблице ключевых слов`);
+
+  // Добавляем rich text ссылки в колонку H
+  addCategoryPickerLinksToRange(sheet, dataStartRow, rowCount);
+
+  console.log('[SUCCESS] ✅ Колонка выбора категорий добавлена');
+  SpreadsheetApp.getActiveSpreadsheet().toast(
+    `Добавлена колонка "Выбор" с кнопками для ${rowCount} строк`,
+    '✅ Успех',
+    3
+  );
 }
 
 /**
@@ -113,6 +123,36 @@ function columnToLetter(column) {
     column = (column - temp - 1) / 26;
   }
   return letter;
+}
+
+/**
+ * Добавляет rich text ссылки в колонку H для вызова диалога подбора категорий
+ *
+ * @param {Sheet} sheet - Лист для добавления ссылок
+ * @param {number} dataStartRow - Строка начала данных
+ * @param {number} rowCount - Количество строк для добавления ссылок
+ */
+function addCategoryPickerLinksToRange(sheet, dataStartRow, rowCount) {
+  const pickerColumn = DETAIL_SHEET_SECTIONS.TAG_KEYWORDS_COLUMNS.PICKER_LINK;
+
+  // Создаем ссылки для указанного количества строк
+  for (let i = 0; i < rowCount; i++) {
+    const row = dataStartRow + i;
+
+    // Создаем rich text ссылку
+    // ВАЖНО: URL "#gid=0" - это фиктивный URL, реальное действие обрабатывается через onSelectionChange
+    const richText = SpreadsheetApp.newRichTextValue()
+      .setText('🔍 Выбрать')
+      .setLinkUrl('#gid=0')  // Фиктивная ссылка для визуального эффекта
+      .build();
+
+    const cell = sheet.getRange(row, pickerColumn);
+    cell.setRichTextValue(richText);
+    cell.setHorizontalAlignment('center');
+    cell.setBackground('#F8F9FA');  // Светло-серый фон для визуального отличия
+  }
+
+  console.log(`[INFO] ✅ Добавлено ${rowCount} ссылок для подбора категорий в колонку H`);
 }
 
 // ============================================
@@ -150,14 +190,20 @@ function calculateSheetSections(sheet) {
       console.log(`[DEBUG calculateSections] Строка ${row}: Найдены КЛЮЧЕВЫЕ СЛОВА`);
     }
 
-    // Ищем заголовок "ВЕРХНЯЯ ПЛИТКА"
-    if (text.includes('ВЕРХН') && text.includes('ПЛИТК')) {
+    // ДЕБАГ: Логируем все строки с "ПЛИТК"
+    if (text.includes('ПЛИТК')) {
+      console.log(`[DEBUG calculateSections] Строка ${row} содержит ПЛИТК: "${text.substring(0, 50)}..."`);
+      console.log(`[DEBUG] Проверки: ВЕРХН=${text.includes('ВЕРХН')}, 🏷️=${text.includes('🏷️')}, !КЛЮЧЕВ=${!text.includes('КЛЮЧЕВ')}`);
+    }
+
+    // Ищем заголовок "ВЕРХНЯЯ ПЛИТКА" (НЕ "ключевые слова")
+    if (text.includes('ВЕРХН') && text.includes('ПЛИТК') && text.includes('🏷️') && !text.includes('КЛЮЧЕВ')) {
       upperTileStart = row;
       console.log(`[DEBUG calculateSections] Строка ${row}: Найдена ВЕРХНЯЯ ПЛИТКА`);
     }
 
-    // Ищем заголовок "НИЖНЯЯ ПЛИТКА"
-    if (text.includes('НИЖН') && text.includes('ПЛИТК')) {
+    // Ищем заголовок "НИЖНЯЯ ПЛИТКА" (НЕ "ключевые слова")
+    if (text.includes('НИЖН') && text.includes('ПЛИТК') && text.includes('🏷️') && !text.includes('КЛЮЧЕВ')) {
       lowerTileStart = row;
       console.log(`[DEBUG calculateSections] Строка ${row}: Найдена НИЖНЯЯ ПЛИТКА`);
     }
@@ -172,7 +218,7 @@ function calculateSheetSections(sheet) {
     if ((text.includes('ТОВАР') || text.includes('PRODUCT')) && !text.includes('ПЛИТК') && !text.includes('СТАТИСТИКА')) {
       productsStart = row + 2; // +2 = заголовок + заголовки столбцов = данные
       console.log(`[DEBUG calculateSections] Строка ${row}: Найден заголовок ТОВАРЫ (текст: "${text}"), данные с ${productsStart}`);
-      break; // Товары - последняя секция
+      // НЕ ПРЕРЫВАЕМ - нужно найти секции плиток тегов ниже!
     }
   }
 

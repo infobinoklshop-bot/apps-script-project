@@ -46,7 +46,8 @@ function addFullCategoryMenu(mainMenu) {
 
   // Плитки тегов (ручное управление)
   const tilesMenu = SpreadsheetApp.getUi().createMenu('🏷️ Плитки тегов')
-    .addItem('📝 Инициализировать таблицу', 'initializeTagKeywordsTable')
+    .addItem('➕ Добавить кнопки выбора категорий', 'addCategoryPickerColumn')
+    .addItem('🔍 Выбрать категорию для текущей ячейки', 'showCategoryPickerForCurrentCell')
     .addSeparator()
     .addItem('✅ Проверить категории', 'validateTagKeywords')
     .addItem('➕ Создать новые категории', 'createCategoriesForTags')
