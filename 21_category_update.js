@@ -38,13 +38,13 @@ function sendCategoryChangesToInSales() {
     
     console.log('[INFO] Отправка изменений категории', categoryId);
 
-    // ИСПРАВЛЕНО: Определяем номер строки начала доп.полей динамически
-    const productsValue = sheet.getRange('B21').getValue();
-    const products = parseInt(productsValue) || 0; // ВАЖНО: Принудительное преобразование в число!
-    const productsStartRow = calculateSheetSections(sheet).productsStart;
-    const extraFieldsStartRow = productsStartRow + products + 5; // Строка после товаров
+    // ИСПРАВЛЕНО V2: Используем надёжную систему позиционирования
+    const sections = calculateSheetSections(sheet);
+    const products = sections.productsCount;  // Читается из statsRow + 1 (B33)
+    const productsStartRow = sections.productsStart;
+    const fieldsRow = sections.fieldsRow;
 
-    console.log(`[DEBUG] products: ${products} (type: ${typeof products}), productsStartRow: ${productsStartRow} (type: ${typeof productsStartRow})`);
+    console.log(`[INFO] products: ${products}, productsStartRow: ${productsStartRow}, fieldsRow: ${fieldsRow}`);
     
     // Читаем ВЕРХНИЕ и НИЖНИЕ теги
     // ПРИОРИТЕТ: сначала пробуем из таблицы, потом из дополнительных полей
@@ -123,7 +123,14 @@ function sendCategoryChangesToInSales() {
     console.log('[INFO] Читаем дополнительные поля из листа...');
 
     const collectionFields = loadCollectionFieldsDictionary();
-    const startRow = extraFieldsStartRow + 2;
+
+    // ИСПРАВЛЕНО V2: Используем fieldsRow из calculateSheetSections
+    const startRow = fieldsRow ? fieldsRow + 2 : null;  // fieldsRow + заголовок + данные
+
+    if (!startRow) {
+      console.warn('[WARN] ⚠️ Секция дополнительных полей не найдена');
+      // Продолжаем без дополнительных полей
+    } else {
 
     // Читаем все строки из секции дополнительных полей
     for (let i = 0; i < 50; i++) {
@@ -178,8 +185,9 @@ function sendCategoryChangesToInSales() {
         console.warn(`⚠️ Поле "${fieldName}" не найдено в справочнике InSales`);
       }
     }
+    } // Закрываем блок if (startRow)
 
-    console.log(`[INFO] Прочитано дополнительных полей для отправки`);
+    console.log(`[INFO] Прочитано дополнительных полей для отправки: ${fieldValues.length}`);
     
     // Собираем ВСЕ изменения для отправки
     const changes = {
@@ -672,15 +680,21 @@ function findFieldValueId(categoryId, fieldName) {
  */
 function getTopTagsFromTable(sheet, productsCount) {
   try {
-    const extraFieldsCount = countExtraFields(sheet, productsCount);
+    // ИСПРАВЛЕНО V3: Используем marker-based позиционирование
+    const sections = calculateSheetSections(sheet);
 
-    // ИСПРАВЛЕНО: Используем динамическое позиционирование
-    const productsStartRow = calculateSheetSections(sheet).productsStart;
-    const topTagsStartRow = productsStartRow + productsCount + 5 + 2 + extraFieldsCount + 3 + 1 + 2 + 1;
-    
-    console.log(`📋 Читаем верхнюю плитку тегов из таблицы (строка ${topTagsStartRow})...`);
-    
-    const data = sheet.getRange(topTagsStartRow, 1, 10, 2).getValues(); // ИСПРАВЛЕНО: Только A-B
+    if (!sections.upperTileRow || !sections.upperHTMLRow) {
+      console.warn('⚠️ Секция верхней плитки не найдена');
+      return [];
+    }
+
+    // Читаем из секции СТАЛО (колонки E-G)
+    const topTagsStartRow = sections.upperTileRow + 4;  // Заголовок + инструкция + пустая + заголовки таблицы
+    const rowsToRead = Math.min(20, sections.upperHTMLRow - topTagsStartRow - 1);  // До HTML-поля
+
+    console.log(`📋 Читаем верхнюю плитку тегов из таблицы (строки ${topTagsStartRow}-${topTagsStartRow + rowsToRead})...`);
+
+    const data = sheet.getRange(topTagsStartRow, 5, rowsToRead, 2).getValues(); // Колонки E-F (СТАЛО)
     
     const tags = [];
     
@@ -712,16 +726,21 @@ function getTopTagsFromTable(sheet, productsCount) {
  */
 function getBottomTagsFromTable(sheet, productsCount) {
   try {
-    const extraFieldsCount = countExtraFields(sheet, productsCount);
+    // ИСПРАВЛЕНО V3: Используем marker-based позиционирование
+    const sections = calculateSheetSections(sheet);
 
-    // ИСПРАВЛЕНО: Используем динамическое позиционирование
-    const productsStartRow = calculateSheetSections(sheet).productsStart;
-    const topTagsStartRow = productsStartRow + productsCount + 5 + 2 + extraFieldsCount + 3 + 1 + 2 + 1;
-    const bottomTagsStartRow = topTagsStartRow + 10 + 3 + 1 + 2 + 1;
-    
-    console.log(`📋 Читаем нижнюю плитку тегов из таблицы (строка ${bottomTagsStartRow})...`);
-    
-    const data = sheet.getRange(bottomTagsStartRow, 1, 10, 2).getValues(); // ИСПРАВЛЕНО: Только A-B
+    if (!sections.lowerTileRow || !sections.lowerHTMLRow) {
+      console.warn('⚠️ Секция нижней плитки не найдена');
+      return [];
+    }
+
+    // Читаем из секции СТАЛО (колонки E-F)
+    const bottomTagsStartRow = sections.lowerTileRow + 4;  // Заголовок + инструкция + пустая + заголовки таблицы
+    const rowsToRead = Math.min(50, sections.lowerHTMLRow - bottomTagsStartRow - 1);  // До HTML-поля
+
+    console.log(`📋 Читаем нижнюю плитку тегов из таблицы (строки ${bottomTagsStartRow}-${bottomTagsStartRow + rowsToRead})...`);
+
+    const data = sheet.getRange(bottomTagsStartRow, 5, rowsToRead, 2).getValues(); // Колонки E-F (СТАЛО)
     
     const tags = [];
     
