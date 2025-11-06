@@ -46,75 +46,82 @@ function sendCategoryChangesToInSales() {
 
     console.log(`[INFO] products: ${products}, productsStartRow: ${productsStartRow}, fieldsRow: ${fieldsRow}`);
     
-    // Читаем ВЕРХНИЕ и НИЖНИЕ теги
-    // ПРИОРИТЕТ: сначала пробуем из таблицы, потом из дополнительных полей
-    let topTags = getTopTagsFromTable(sheet, products);
-    if (topTags.length === 0) {
-      console.log('⚠️ Верхняя таблица пуста, читаем из дополнительных полей...');
-      topTags = getTopTagsFromSheet(sheet, products);
+    // Читаем готовый HTML плиток тегов из полей "HTML код (финальный)"
+    // ИСПРАВЛЕНО V4: Теперь функции возвращают готовый HTML, а не массивы тегов
+    let topTagsHTML = getTopTagsFromTable(sheet, products);
+    if (!topTagsHTML || topTagsHTML === '') {
+      console.log('⚠️ Верхняя плитка пуста, пробуем читать из дополнительных полей...');
+      const topTagsArray = getTopTagsFromSheet(sheet, products);
+      if (topTagsArray.length > 0) {
+        topTagsHTML = generateTagsBlockHTML(topTagsArray);
+      }
     }
 
-    let bottomTags = getBottomTagsFromTable(sheet, products);
-    if (bottomTags.length === 0) {
-      console.log('⚠️ Нижняя таблица пуста, читаем из дополнительных полей...');
-      bottomTags = getBottomTagsFromSheet(sheet, products);
+    let bottomTagsHTML = getBottomTagsFromTable(sheet, products);
+    if (!bottomTagsHTML || bottomTagsHTML === '') {
+      console.log('⚠️ Нижняя плитка пуста, пробуем читать из дополнительных полей...');
+      const bottomTagsArray = getBottomTagsFromSheet(sheet, products);
+      if (bottomTagsArray.length > 0) {
+        bottomTagsHTML = generateTagsBlockHTML(bottomTagsArray);
+      }
     }
-    
+
     // Получаем описание
     let description = getDescriptionForInSales(sheet);
-    
+
     // Формируем финальное описание (описание идёт БЕЗ тегов, теги в отдельных полях)
     let finalDescription = description;
-    
+
     // Собираем field_values для отправки
     const fieldValues = [];
-    
+
     // H1 заголовок - отправляем с ID существующего field_value
     const h1Value = sheet.getRange('B15').getValue();
     if (h1Value && h1Value.toString().trim() !== '') {
       const h1FieldValueId = findFieldValueId(categoryId, 'H1');
       if (h1FieldValueId) {
-        fieldValues.push({ 
+        fieldValues.push({
           id: h1FieldValueId,
-          value: h1Value.toString().trim() 
+          value: h1Value.toString().trim()
         });
       }
     }
-    
+
     // Блок ссылок сверху (верхняя плитка)
-    if (topTags.length > 0) {
-      const topTagsHTML = generateTagsBlockHTML(topTags);
-      const topTagsFieldValueId = findFieldValueId(categoryId, 'Блок ссылок сверху');
-      if (topTagsFieldValueId) {
-        fieldValues.push({ 
-          id: topTagsFieldValueId,
-          value: topTagsHTML 
-        });
-        console.log('[INFO] 🏷️ Верхних тегов:', topTags.length);
+    // ИСПРАВЛЕНО V8: Всегда отправляем поле (даже если пусто), чтобы очистить старый мусор
+    const topTagsFieldValueId = findFieldValueId(categoryId, 'Блок ссылок сверху');
+    if (topTagsFieldValueId) {
+      fieldValues.push({
+        id: topTagsFieldValueId,
+        value: topTagsHTML || '' // Отправляем пустую строку, если нет данных
+      });
+      if (topTagsHTML && topTagsHTML !== '') {
+        console.log(`[INFO] 🏷️ Верхняя плитка: ${topTagsHTML.length} символов HTML`);
+      } else {
+        console.log(`[INFO] 🏷️ Верхняя плитка: очищаем (был плейсхолдер или пусто)`);
       }
     }
 
     // Блок ссылок (нижняя плитка)
-    if (bottomTags.length > 0) {
-      const bottomTagsHTML = generateTagsBlockHTML(bottomTags);
+    if (bottomTagsHTML && bottomTagsHTML !== '') {
       const bottomTagsFieldValueId = findFieldValueId(categoryId, 'Блок ссылок');
-      
+
       if (bottomTagsFieldValueId) {
         // ИСПРАВЛЕНО: Обновляем существующее поле через id
-        fieldValues.push({ 
+        fieldValues.push({
           id: bottomTagsFieldValueId,
-          value: bottomTagsHTML 
+          value: bottomTagsHTML
         });
-        console.log('[INFO] 🏷️ Нижних тегов:', bottomTags.length);
+        console.log(`[INFO] 🏷️ Нижняя плитка: ${bottomTagsHTML.length} символов HTML`);
       } else {
         // Если поле не существует - создаём новое
         const bottomTagsFieldId = getFieldIdByName('Блок ссылок');
         if (bottomTagsFieldId) {
-          fieldValues.push({ 
+          fieldValues.push({
             collection_field_id: bottomTagsFieldId,
-            value: bottomTagsHTML 
+            value: bottomTagsHTML
           });
-          console.log('[INFO] 🏷️ Создаём новое поле "Блок ссылок" с тегами:', bottomTags.length);
+          console.log(`[INFO] 🏷️ Создаём новое поле "Блок ссылок": ${bottomTagsHTML.length} символов HTML`);
         }
       }
     }
@@ -230,8 +237,8 @@ function sendCategoryChangesToInSales() {
       message += `📁 ID категории: ${categoryId}\n`;
       message += `📝 Обновлено основных полей: ${Object.keys(changes.collection).filter(k => changes.collection[k] !== null).length}\n`;
       message += `⚙️ Обновлено дополнительных полей: ${fieldValues.length}\n`;
-      message += `🏷️ Верхних тегов: ${topTags.length}\n`;
-      message += `🏷️ Нижних тегов: ${bottomTags.length}\n\n`;
+      message += `🏷️ Верхняя плитка: ${topTagsHTML ? (topTagsHTML.length + ' символов') : 'не задана'}\n`;
+      message += `🏷️ Нижняя плитка: ${bottomTagsHTML ? (bottomTagsHTML.length + ' символов') : 'не задана'}\n\n`;
       
       message += `📊 СТАТУС ТОВАРОВ В КАТЕГОРИИ:\n`;
       message += `• Всего товаров: ${productStats.total}\n`;
@@ -343,28 +350,46 @@ function getDescriptionForInSales(sheet) {
  */
 function getTopTagsFromSheet(sheet, productsCount) {
   try {
-    const extraFieldsCount = countExtraFields(sheet, productsCount);
-    // ИСПРАВЛЕНО: Используем динамическое позиционирование
-    const productsStartRow = calculateSheetSections(sheet).productsStart;
-    const topTagsStartRow = productsStartRow + productsCount + 5 + 2 + extraFieldsCount + 3 + 1 + 2 + 1;
-    
-    const data = sheet.getRange(topTagsStartRow, 1, 10, 2).getValues(); // Колонки A и B
+    // ИСПРАВЛЕНО V6: Используем секции из calculateSheetSections
+    const sections = calculateSheetSections(sheet);
+
+    if (!sections.upperTileRow) {
+      console.warn('⚠️ Секция верхней плитки не найдена');
+      return [];
+    }
+
+    // ИСПРАВЛЕНО V7: Читаем из колонок A (БЫЛО: Текст ссылки) и B (БЫЛО: URL)
+    // чтобы сохранить существующие теги из InSales
+    // Данные начинаются через 4 строки после заголовка секции (заголовок + инструкция + пусто + headers + data)
+    const dataStartRow = sections.upperTileRow + 4;
+
+    const data = sheet.getRange(dataStartRow, 1, 10, 2).getValues(); // Колонки A и B (БЫЛО)
     
     const tags = [];
     
     for (let i = 0; i < data.length; i++) {
       const text = data[i][0];
       const url = data[i][1];
-      
-      if (text && text.toString().trim() !== '' && 
+
+      // ИСПРАВЛЕНО V6: Останавливаемся при встрече "HTML код" (начало следующей секции)
+      if (text && text.toString().includes('HTML код')) {
+        console.log(`🛑 Достигли конца секции верхних тегов на строке ${dataStartRow + i}`);
+        break;
+      }
+
+      if (text && text.toString().trim() !== '' &&
           url && url.toString().trim() !== '') {
+
+        const textStr = text.toString().trim();
+        const urlStr = url.toString().trim();
+
         tags.push({
-          text: text.toString().trim(),
-          url: url.toString().trim()
+          text: textStr,
+          url: urlStr
         });
       }
     }
-    
+
     console.log(`🏷️ Найдено верхних тегов: ${tags.length}`);
     return tags;
     
@@ -380,29 +405,46 @@ function getTopTagsFromSheet(sheet, productsCount) {
  */
 function getBottomTagsFromSheet(sheet, productsCount) {
   try {
-    const extraFieldsCount = countExtraFields(sheet, productsCount);
-    // ИСПРАВЛЕНО: Используем динамическое позиционирование
-    const productsStartRow = calculateSheetSections(sheet).productsStart;
-    const topTagsStartRow = productsStartRow + productsCount + 5 + 2 + extraFieldsCount + 3 + 1 + 2 + 1;
-    const bottomTagsStartRow = topTagsStartRow + 10 + 3 + 1 + 2 + 1;
-    
-    const data = sheet.getRange(bottomTagsStartRow, 1, 10, 2).getValues(); // Колонки A и B
+    // ИСПРАВЛЕНО V6: Используем секции из calculateSheetSections
+    const sections = calculateSheetSections(sheet);
+
+    if (!sections.lowerTileRow) {
+      console.warn('⚠️ Секция нижней плитки не найдена');
+      return [];
+    }
+
+    // ИСПРАВЛЕНО V7: Читаем из колонок A (БЫЛО: Текст ссылки) и B (БЫЛО: URL)
+    // чтобы сохранить существующие теги из InSales
+    // Данные начинаются через 4 строки после заголовка секции (заголовок + инструкция + пусто + headers + data)
+    const dataStartRow = sections.lowerTileRow + 4;
+
+    const data = sheet.getRange(dataStartRow, 1, 20, 2).getValues(); // Колонки A и B (БЫЛО), больше строк для нижней
     
     const tags = [];
     
     for (let i = 0; i < data.length; i++) {
       const text = data[i][0];
       const url = data[i][1];
-      
-      if (text && text.toString().trim() !== '' && 
+
+      // ИСПРАВЛЕНО V6: Останавливаемся при встрече "HTML код" (начало следующей секции)
+      if (text && text.toString().includes('HTML код')) {
+        console.log(`🛑 Достигли конца секции нижних тегов на строке ${dataStartRow + i}`);
+        break;
+      }
+
+      if (text && text.toString().trim() !== '' &&
           url && url.toString().trim() !== '') {
+
+        const textStr = text.toString().trim();
+        const urlStr = url.toString().trim();
+
         tags.push({
-          text: text.toString().trim(),
-          url: url.toString().trim()
+          text: textStr,
+          url: urlStr
         });
       }
     }
-    
+
     console.log(`🏷️ Найдено нижних тегов: ${tags.length}`);
     return tags;
     
@@ -675,108 +717,86 @@ function findFieldValueId(categoryId, fieldName) {
  */
 
 /**
- * Читает верхнюю плитку тегов из таблицы (строки 76+)
- * Приоритет: таблица → существующее поле
+ * Читает готовый HTML верхней плитки тегов из поля "HTML код (финальный)"
+ * @returns {string} HTML код или пустая строка
  */
 function getTopTagsFromTable(sheet, productsCount) {
   try {
-    // ИСПРАВЛЕНО V3: Используем marker-based позиционирование
+    // ИСПРАВЛЕНО V4: Читаем готовый HTML из поля "HTML код (финальный)"
     const sections = calculateSheetSections(sheet);
 
-    if (!sections.upperTileRow || !sections.upperHTMLRow) {
+    if (!sections.upperHTMLRow) {
       console.warn('⚠️ Секция верхней плитки не найдена');
-      return [];
+      return '';
     }
 
-    // Читаем из секции СТАЛО (колонки E-F)
-    const topTagsStartRow = sections.upperTileRow + 4;  // Заголовок + инструкция + пустая + заголовки таблицы
-    const maxRows = sections.upperHTMLRow - topTagsStartRow - 1;  // До HTML-поля
+    console.log(`📋 Читаем готовый HTML верхней плитки из строки ${sections.upperHTMLRow}...`);
 
-    if (maxRows <= 0) {
-      console.warn('⚠️ Нет данных между заголовком и HTML-полем верхней плитки');
-      return [];
+    // HTML находится в объединённых ячейках B-H в строке upperHTMLRow
+    // Читаем из колонки B (первая ячейка объединённого диапазона)
+    const htmlContent = sheet.getRange(sections.upperHTMLRow, 2).getValue();
+
+    if (!htmlContent || htmlContent.toString().trim() === '') {
+      console.warn('⚠️ HTML код верхней плитки пуст');
+      return '';
     }
 
-    const rowsToRead = Math.min(20, maxRows);
+    const html = htmlContent.toString().trim();
 
-    console.log(`📋 Читаем верхнюю плитку тегов из таблицы (строки ${topTagsStartRow}-${topTagsStartRow + rowsToRead - 1})...`);
-
-    const data = sheet.getRange(topTagsStartRow, 5, rowsToRead, 2).getValues(); // Колонки E-F (СТАЛО)
-    
-    const tags = [];
-    
-    for (let i = 0; i < data.length; i++) {
-      const text = data[i][0];  // Колонка A - Текст ссылки
-      const url = data[i][1];   // Колонка B - URL
-      
-      if (text && text.toString().trim() !== '' && 
-          url && url.toString().trim() !== '') {
-        tags.push({
-          text: text.toString().trim(),
-          url: url.toString().trim()
-        });
-      }
+    // ИСПРАВЛЕНО V5: Проверяем, не является ли это плейсхолдером
+    if (html === 'HTML код будет сгенерирован после создания плиток') {
+      console.warn('⚠️ Верхняя плитка содержит плейсхолдер, пропускаем отправку');
+      return '';
     }
-    
-    console.log(`✅ Прочитано верхних тегов из таблицы: ${tags.length}`);
-    return tags;
-    
+
+    console.log(`✅ Прочитан HTML верхней плитки (${html.length} символов)`);
+    return html;
+
   } catch (error) {
-    console.error('❌ Ошибка чтения верхней плитки из таблицы:', error);
-    return [];
+    console.error('❌ Ошибка чтения HTML верхней плитки:', error);
+    return '';
   }
 }
 
 /**
- * Читает нижнюю плитку тегов из таблицы
- * Приоритет: таблица → существующее поле
+ * Читает готовый HTML нижней плитки тегов из поля "HTML код (финальный)"
+ * @returns {string} HTML код или пустая строка
  */
 function getBottomTagsFromTable(sheet, productsCount) {
   try {
-    // ИСПРАВЛЕНО V3: Используем marker-based позиционирование
+    // ИСПРАВЛЕНО V4: Читаем готовый HTML из поля "HTML код (финальный)"
     const sections = calculateSheetSections(sheet);
 
-    if (!sections.lowerTileRow || !sections.lowerHTMLRow) {
+    if (!sections.lowerHTMLRow) {
       console.warn('⚠️ Секция нижней плитки не найдена');
-      return [];
+      return '';
     }
 
-    // Читаем из секции СТАЛО (колонки E-F)
-    const bottomTagsStartRow = sections.lowerTileRow + 4;  // Заголовок + инструкция + пустая + заголовки таблицы
-    const maxRows = sections.lowerHTMLRow - bottomTagsStartRow - 1;  // До HTML-поля
+    console.log(`📋 Читаем готовый HTML нижней плитки из строки ${sections.lowerHTMLRow}...`);
 
-    if (maxRows <= 0) {
-      console.warn('⚠️ Нет данных между заголовком и HTML-полем нижней плитки');
-      return [];
+    // HTML находится в объединённых ячейках B-H в строке lowerHTMLRow
+    // Читаем из колонки B (первая ячейка объединённого диапазона)
+    const htmlContent = sheet.getRange(sections.lowerHTMLRow, 2).getValue();
+
+    if (!htmlContent || htmlContent.toString().trim() === '') {
+      console.warn('⚠️ HTML код нижней плитки пуст');
+      return '';
     }
 
-    const rowsToRead = Math.min(50, maxRows);
+    const html = htmlContent.toString().trim();
 
-    console.log(`📋 Читаем нижнюю плитку тегов из таблицы (строки ${bottomTagsStartRow}-${bottomTagsStartRow + rowsToRead - 1})...`);
-
-    const data = sheet.getRange(bottomTagsStartRow, 5, rowsToRead, 2).getValues(); // Колонки E-F (СТАЛО)
-    
-    const tags = [];
-    
-    for (let i = 0; i < data.length; i++) {
-      const text = data[i][0];
-      const url = data[i][1];
-      
-      if (text && text.toString().trim() !== '' && 
-          url && url.toString().trim() !== '') {
-        tags.push({
-          text: text.toString().trim(),
-          url: url.toString().trim()
-        });
-      }
+    // ИСПРАВЛЕНО V5: Проверяем, не является ли это плейсхолдером
+    if (html === 'HTML код будет сгенерирован после создания плиток') {
+      console.warn('⚠️ Нижняя плитка содержит плейсхолдер, пропускаем отправку');
+      return '';
     }
-    
-    console.log(`✅ Прочитано нижних тегов из таблицы: ${tags.length}`);
-    return tags;
-    
+
+    console.log(`✅ Прочитан HTML нижней плитки (${html.length} символов)`);
+    return html;
+
   } catch (error) {
-    console.error('❌ Ошибка чтения нижней плитки из таблицы:', error);
-    return [];
+    console.error('❌ Ошибка чтения HTML нижней плитки:', error);
+    return '';
   }
 }
 

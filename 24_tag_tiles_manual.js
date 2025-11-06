@@ -12,6 +12,56 @@
  */
 
 // ============================================
+// ДИНАМИЧЕСКИЙ РАСЧЁТ ПОЗИЦИЙ СЕКЦИЙ
+// ============================================
+
+/**
+ * Находит строку с заголовком секции по текстовому маркеру
+ * @param {Sheet} sheet - Лист Google Sheets
+ * @param {string} markerText - Текст маркера для поиска (например, "📊 СТАТИСТИКА")
+ * @param {number} startRow - Начальная строка поиска (по умолчанию 1)
+ * @param {number} endRow - Конечная строка поиска (по умолчанию null = до конца листа)
+ * @returns {number|null} - Номер строки с маркером или null
+ */
+function findSectionByMarker(sheet, markerText, startRow = 1, endRow = null) {
+  try {
+    const lastRow = sheet.getLastRow();
+    const searchEndRow = endRow || Math.min(lastRow, 1000);
+
+    if (searchEndRow < startRow) {
+      console.warn(`[findSectionByMarker] WARNING: endRow (${searchEndRow}) < startRow (${startRow})`);
+      return null;
+    }
+
+    console.log(`[findSectionByMarker] Поиск "${markerText.substring(0, 30)}..." в строках ${startRow}-${searchEndRow}`);
+
+    // Читаем первую колонку в диапазоне поиска
+    const searchRange = sheet.getRange(startRow, 1, searchEndRow - startRow + 1, 1);
+    const values = searchRange.getValues();
+
+    for (let i = 0; i < values.length; i++) {
+      const cellValue = values[i][0];
+      if (!cellValue) continue;
+
+      const cellText = cellValue.toString();
+
+      // Ищем точное включение текста маркера
+      if (cellText.includes(markerText)) {
+        const foundRow = startRow + i;
+        console.log(`[findSectionByMarker] ✅ Найдено в строке ${foundRow}: "${cellText.substring(0, 50)}..."`);
+        return foundRow;
+      }
+    }
+
+    console.warn(`[findSectionByMarker] ⚠️ Не найдено: "${markerText}"`);
+    return null;
+  } catch (error) {
+    console.error(`[findSectionByMarker] ❌ Ошибка поиска секции "${markerText}":`, error.message);
+    return null;
+  }
+}
+
+// ============================================
 // ИНИЦИАЛИЗАЦИЯ ТАБЛИЦЫ КЛЮЧЕВЫХ СЛОВ
 // ============================================
 
@@ -668,23 +718,46 @@ function extractCategoryId(categoryLink) {
 function buildCategoryLink(categoryLink) {
   const linkStr = categoryLink.toString().trim();
 
-  // Если это уже полный URL
+  console.log(`[buildCategoryLink] INPUT: "${linkStr}" (type: ${typeof categoryLink})`);
+
+  // Если это уже полный URL (http/https) - возвращаем как есть
   if (linkStr.includes('http')) {
+    console.log(`[buildCategoryLink] → HTTP URL, returning as is`);
     return linkStr;
   }
 
-  // Если это ID - получаем handle из API
+  // Получаем базовый URL из конфига
+  const config = getInsalesConfig();
+  const baseUrl = `https://${config.shop}`; // https://binokl.shop
+
+  // Если это уже правильный путь /collection/... - добавляем домен
+  if (linkStr.startsWith('/collection/')) {
+    const result = `${baseUrl}${linkStr}`;
+    console.log(`[buildCategoryLink] → Already has /collection/, adding domain: "${result}"`);
+    return result;
+  }
+
+  // Если это ID - получаем handle из API и добавляем домен
   if (/^\d+$/.test(linkStr)) {
+    console.log(`[buildCategoryLink] → Numeric ID, fetching handle from API`);
     const handle = getCategoryHandle(parseInt(linkStr));
-    return handle ? `/collection/${handle}` : '#';
+    const result = handle ? `${baseUrl}/collection/${handle}` : '#';
+    console.log(`[buildCategoryLink] → Result: "${result}"`);
+    return result;
   }
 
-  // Если это handle
+  // Если это путь начинается с / но не /collection/ - добавляем домен
   if (linkStr.startsWith('/')) {
-    return linkStr;
+    const result = `${baseUrl}${linkStr}`;
+    console.log(`[buildCategoryLink] → Path starting with /, adding domain: "${result}"`);
+    return result;
   }
 
-  return `/collection/${linkStr}`;
+  // Если это просто handle без слеша - добавляем /collection/ и домен
+  console.log(`[buildCategoryLink] → Plain handle, adding domain and /collection/ prefix`);
+  const result = `${baseUrl}/collection/${linkStr}`;
+  console.log(`[buildCategoryLink] → Result: "${result}"`);
+  return result;
 }
 
 /**
@@ -706,7 +779,22 @@ function getCategoryHandle(categoryId) {
 
     if (response.getResponseCode() === 200) {
       const data = JSON.parse(response.getContentText());
-      return data.handle || data.url || data.id;
+
+      // ИСПРАВЛЕНО: Если handle есть - возвращаем его
+      if (data.handle) {
+        return data.handle;
+      }
+
+      // Если есть URL - извлекаем handle из него
+      if (data.url) {
+        const match = data.url.match(/\/collection\/([^\/]+)/);
+        if (match) {
+          return match[1]; // Возвращаем только handle без префикса
+        }
+      }
+
+      // Фоллбэк - возвращаем ID
+      return data.id;
     }
   } catch (error) {
     console.log(`[WARNING] Не удалось получить handle для категории ${categoryId}`);
