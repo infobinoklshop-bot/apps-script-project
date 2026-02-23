@@ -559,7 +559,7 @@ function generateCategoryDescriptionMass() {
 
         const response = callGeminiWithTemperature_(
           preparedPrompt,
-          SEO_TAGS_PROMPTS.SYSTEM,
+          SEO_TAGS_PROMPTS.DESCRIPTION_SYSTEM,
           SEO_TAGS_CONFIG.TEMPERATURES.SINGLE
         );
 
