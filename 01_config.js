@@ -95,14 +95,14 @@ const OPENAI_CONFIG = {
 // ========================================
 
 const GOOGLE_GEMINI_V2_CONFIG = {
-  apiKey: 'AIzaSyD7xd_gvG7XvMOR97Iw9aZbTYgs1q5RTRM',
+  apiKey: 'AIzaSyBCP2-mHQvJjHB6J_4STCJi592hqx8m3Ts',
   model: 'gemini-3-pro-preview',
   temperature: 0.7,
   maxOutputTokens: 8192
 };
 
 const GOOGLE_GEMINI_IMAGE_CONFIG = {
-  apiKey: 'AIzaSyD7xd_gvG7XvMOR97Iw9aZbTYgs1q5RTRM', // Используем тот же ключ
+  apiKey: 'AIzaSyBCP2-mHQvJjHB6J_4STCJi592hqx8m3Ts', // Используем тот же ключ
   model: 'gemini-3-pro-image-preview',
   driveFolder: 'AI_Generated_Banners'
 };
