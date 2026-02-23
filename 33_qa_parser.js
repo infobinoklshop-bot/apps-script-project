@@ -19,14 +19,6 @@ function importQaFromSheet() {
 
         const importData = importSheet.getRange(2, 1, lastRow - 1, 3).getValues();
 
-        // ======= DEBUG INFO =======
-        const debugDump = [];
-        for (let i = 0; i < Math.min(8, importData.length); i++) {
-            debugDump.push(`A="` + importData[i][0] + `" B="` + importData[i][1] + `"`);
-        }
-        ui.alert('ОТЛАДКА: Первые 8 строк листа "Импорт Q&A"', debugDump.join('\n'), ui.ButtonSet.OK);
-        // ==========================
-
         // Группируем вопросы по названию категории
         const qaByCategory = {};
         let currentCategory = '';
@@ -49,12 +41,6 @@ function importQaFromSheet() {
                 qaByCategory[currentCategory].push(`В: ${colA}\nО: ${colB}`);
             }
         }
-
-        ui.alert('ОТЛАДКА: Распознанные категории',
-            `Всего: ${Object.keys(qaByCategory).length}\n\n` +
-            Object.keys(qaByCategory).join(', '),
-            ui.ButtonSet.OK
-        );
 
         // Получаем отмеченные строки на листе SEO-теги
         const selectedRows = getSelectedSeoTagRows_();
