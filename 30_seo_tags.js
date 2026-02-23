@@ -610,7 +610,7 @@ function generateCategoryDescriptionMass() {
 /**
  * Массовая поэтапная генерация SEO-тегов
  */
-function generateSeoTagsStagedMass(silent, useRow2Prompts) {
+function generateSeoTagsStagedMass(silent) {
   const context = 'generateSeoTagsStagedMass';
   const ui = silent ? null : SpreadsheetApp.getUi();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -625,7 +625,7 @@ function generateSeoTagsStagedMass(silent, useRow2Prompts) {
       return { complete: false, pendingCount: 0 };
     }
 
-    const checkedRows = getCheckedRowsFromSeoTagsSheet_(sheet, useRow2Prompts || false);
+    const checkedRows = getCheckedRowsFromSeoTagsSheet_(sheet);
 
     if (checkedRows.length === 0) {
       if (!silent) ui.alert('Ошибка', 'Не выбрано ни одной строки', ui.ButtonSet.OK);
@@ -1327,7 +1327,7 @@ function parseSeoTagsResult_(response) {
  * @param {string} categoryName - Название категории
  * @param {boolean} [useRow2Prompts=false] - Если true, промпты и УТП берутся из строки 2
  */
-function findCategoryInSeoTagsSheet_(categoryId, categoryName, useRow2Prompts) {
+function findCategoryInSeoTagsSheet_(categoryId, categoryName) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(SEO_TAGS_CONFIG.MASS_SHEET_NAME);
 
@@ -1338,7 +1338,7 @@ function findCategoryInSeoTagsSheet_(categoryId, categoryName, useRow2Prompts) {
   const data = sheet.getDataRange().getValues();
   const cols = SEO_TAGS_CONFIG.MASS_COLUMNS;
 
-  const row2Prompts = useRow2Prompts ? getPromptsFromRow2_(sheet) : null;
+  const row2Prompts = getPromptsFromRow2_(sheet);
 
   for (let i = SEO_TAGS_CONFIG.MASS_DATA_START_ROW - 1; i < data.length; i++) {
     const rowId = data[i][cols.ID - 1];
@@ -1356,11 +1356,11 @@ function findCategoryInSeoTagsSheet_(categoryId, categoryName, useRow2Prompts) {
         qa: data[i][cols.QA - 1] || '',
         competitorsTitle: data[i][cols.COMPETITORS_TITLE - 1] || '',
         competitorsDesc: data[i][cols.COMPETITORS_DESC - 1] || '',
-        usp: row2Prompts ? row2Prompts.usp : (data[i][cols.USP - 1] || ''),
-        promptSingle: row2Prompts ? row2Prompts.promptSingle : (data[i][cols.PROMPT_SINGLE - 1] || ''),
-        promptStage1: row2Prompts ? row2Prompts.promptStage1 : (data[i][cols.PROMPT_STAGE_1 - 1] || ''),
-        promptStage2: row2Prompts ? row2Prompts.promptStage2 : (data[i][cols.PROMPT_STAGE_2 - 1] || ''),
-        promptStage3: row2Prompts ? row2Prompts.promptStage3 : (data[i][cols.PROMPT_STAGE_3 - 1] || '')
+        usp: (data[i][cols.USP - 1] || '') || row2Prompts.usp,
+        promptSingle: (data[i][cols.PROMPT_SINGLE - 1] || '') || row2Prompts.promptSingle,
+        promptStage1: (data[i][cols.PROMPT_STAGE_1 - 1] || '') || row2Prompts.promptStage1,
+        promptStage2: (data[i][cols.PROMPT_STAGE_2 - 1] || '') || row2Prompts.promptStage2,
+        promptStage3: (data[i][cols.PROMPT_STAGE_3 - 1] || '') || row2Prompts.promptStage3
       };
     }
   }
@@ -1390,12 +1390,12 @@ function getPromptsFromRow2_(sheet) {
  * @param {Sheet} sheet - Лист "SEO-теги"
  * @param {boolean} [useRow2Prompts=false] - Если true, промпты и УТП берутся из строки 2
  */
-function getCheckedRowsFromSeoTagsSheet_(sheet, useRow2Prompts) {
+function getCheckedRowsFromSeoTagsSheet_(sheet) {
   const data = sheet.getDataRange().getValues();
   const cols = SEO_TAGS_CONFIG.MASS_COLUMNS;
   const checkedRows = [];
 
-  const row2Prompts = useRow2Prompts ? getPromptsFromRow2_(sheet) : null;
+  const row2Prompts = getPromptsFromRow2_(sheet);
 
   for (let i = SEO_TAGS_CONFIG.MASS_DATA_START_ROW - 1; i < data.length; i++) {
     if (data[i][cols.CHECKBOX - 1] === true) {
@@ -1411,11 +1411,11 @@ function getCheckedRowsFromSeoTagsSheet_(sheet, useRow2Prompts) {
         qa: data[i][cols.QA - 1] || '',
         competitorsTitle: data[i][cols.COMPETITORS_TITLE - 1] || '',
         competitorsDesc: data[i][cols.COMPETITORS_DESC - 1] || '',
-        usp: row2Prompts ? row2Prompts.usp : (data[i][cols.USP - 1] || ''),
-        promptSingle: row2Prompts ? row2Prompts.promptSingle : (data[i][cols.PROMPT_SINGLE - 1] || ''),
-        promptStage1: row2Prompts ? row2Prompts.promptStage1 : (data[i][cols.PROMPT_STAGE_1 - 1] || ''),
-        promptStage2: row2Prompts ? row2Prompts.promptStage2 : (data[i][cols.PROMPT_STAGE_2 - 1] || ''),
-        promptStage3: row2Prompts ? row2Prompts.promptStage3 : (data[i][cols.PROMPT_STAGE_3 - 1] || '')
+        usp: (data[i][cols.USP - 1] || '') || row2Prompts.usp,
+        promptSingle: (data[i][cols.PROMPT_SINGLE - 1] || '') || row2Prompts.promptSingle,
+        promptStage1: (data[i][cols.PROMPT_STAGE_1 - 1] || '') || row2Prompts.promptStage1,
+        promptStage2: (data[i][cols.PROMPT_STAGE_2 - 1] || '') || row2Prompts.promptStage2,
+        promptStage3: (data[i][cols.PROMPT_STAGE_3 - 1] || '') || row2Prompts.promptStage3
       });
     }
   }
@@ -5192,7 +5192,7 @@ function runSeoPipelinePhase2() {
     // --- ШАГ 4: Генерация SEO-тегов ---
     if (pipeline.step === 'generation') {
       ss.toast('Фаза 2, шаг 4/4: Генерация SEO-тегов (3 этапа)...', '🔄', -1);
-      const result = generateSeoTagsStagedMass(true, true); // silent=true, useRow2Prompts=true
+      const result = generateSeoTagsStagedMass(true); // silent=true
 
       if (!result || !result.complete) {
         ss.toast('Генерация не завершена. Авто-перезапуск через 1 мин...', '⏳', -1);
