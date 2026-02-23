@@ -21,19 +21,25 @@ function importQaFromSheet() {
 
         // Группируем вопросы по названию категории
         const qaByCategory = {};
+        let currentCategory = '';
+
         for (let i = 0; i < importData.length; i++) {
             const row = importData[i];
-            const categoryName = String(row[0] || '').trim();
-            const question = String(row[1] || '').trim();
-            const answer = String(row[2] || '').trim();
+            const colA = String(row[0] || '').trim();
+            const colB = String(row[1] || '').trim();
 
-            if (!categoryName || !question || !answer) continue;
+            if (!colA) continue; // пустая строка
 
-            if (!qaByCategory[categoryName]) {
-                qaByCategory[categoryName] = [];
+            // Если в колонке B пусто, значит в колонке A находится заголовок (название категории)
+            if (!colB) {
+                currentCategory = colA;
+                if (!qaByCategory[currentCategory]) {
+                    qaByCategory[currentCategory] = [];
+                }
+            } else if (currentCategory) {
+                // Если колонка B не пустая, то это вопрос (A) и ответ (B)
+                qaByCategory[currentCategory].push(`В: ${colA}\nО: ${colB}`);
             }
-
-            qaByCategory[categoryName].push(`В: ${question}\nО: ${answer}`);
         }
 
         // Получаем отмеченные строки на листе SEO-теги
@@ -55,13 +61,47 @@ function importQaFromSheet() {
         const seoSheet = ss.getSheetByName(SEO_TAGS_CONFIG.MASS_SHEET_NAME);
         let updatedCount = 0;
 
+        // Функция для нечеткого сравнения строк (обрезка окончаний)
+        function isMatch(name1, name2) {
+            const getStems = s => s.toLowerCase().replace(/[^a-zа-яё0-9]/g, ' ').split(' ')
+                .filter(w => w.length > 2)
+                .map(w => w.length > 4 ? w.slice(0, -2) : w);
+
+            const stems1 = getStems(name1);
+            const stems2 = getStems(name2);
+
+            if (stems1.length === 0 || stems2.length === 0) return false;
+
+            // Проверяем, содержит ли одно название все корни другого
+            const s2in1 = stems2.every(s2 => stems1.some(s1 => s1.includes(s2) || s2.includes(s1)));
+            const s1in2 = stems1.every(s1 => stems2.some(s2 => s2.includes(s1) || s1.includes(s2)));
+
+            return s2in1 || s1in2;
+        }
+
         // Идем по выбранным строкам и обновляем их
         for (const rowObj of selectedRows) {
-            // Убираем возможные лишние пробелы из названия категории для точного сравнения
             const pageName = String(rowObj.pageName || '').trim();
+            if (!pageName) continue;
 
-            if (qaByCategory[pageName]) {
-                const qaText = qaByCategory[pageName].join('\n\n');
+            let matchedCategory = null;
+            // 1. Пытаемся найти точное совпадение (без учета регистра)
+            const exactMatch = Object.keys(qaByCategory).find(c => c.toLowerCase() === pageName.toLowerCase());
+
+            if (exactMatch) {
+                matchedCategory = exactMatch;
+            } else {
+                // 2. Нечеткое совпадение (стемминг)
+                for (const cat of Object.keys(qaByCategory)) {
+                    if (isMatch(pageName, cat)) {
+                        matchedCategory = cat;
+                        break;
+                    }
+                }
+            }
+
+            if (matchedCategory && qaByCategory[matchedCategory].length > 0) {
+                const qaText = qaByCategory[matchedCategory].join('\n\n');
                 seoSheet.getRange(rowObj.row, SEO_TAGS_CONFIG.MASS_COLUMNS.QA).setValue(qaText);
                 updatedCount++;
             }
