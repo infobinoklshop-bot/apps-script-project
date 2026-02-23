@@ -81,7 +81,7 @@ function importQaFromSheet() {
 
         // Идем по выбранным строкам и обновляем их
         for (const rowObj of selectedRows) {
-            const pageName = String(rowObj.pageName || '').trim();
+            const pageName = String(rowObj.h1 || '').trim();
             if (!pageName) continue;
 
             let matchedCategory = null;
