@@ -1,0 +1,71 @@
+{% assign dynamic_handle = collection.fields.polular-cat-prod %}
+{% assign dynamic_col = collections[dynamic_handle] %}
+
+{% if dynamic_handle != blank and dynamic_col.products.size > 0 %}
+  {% assign page_has_list_item = true %}
+  <div class="special-products js-special-products">
+      {% assign block_name = widget_settings.heading | default: "Вам может понравиться" %}
+      <div class="special-products__head">
+         <h3 class="h2 special-products__title heading font-druk">{{ block_name }}</h3>
+         <div class="special-products__slider-controls">
+            <div class="special-products__slider-arrow special-products__slider-arrow-prev js-move-slide">
+               <span class="class-special-products__slider-arrow-icon icon-arrow-left"></span>
+            </div>
+            <div class="special-products__slider-arrow special-products__slider-arrow-next js-move-slide">
+               <span class="class-special-products__slider-arrow-icon icon-arrow-right"></span>
+            </div>
+         </div>
+      </div>
+
+      <div class="splide js-special-products-slider"
+           data-slide-min-width="{{ widget_settings.slide-width | default: 250 }}"
+           data-slide-min-width-mobile="{{ widget_settings.slide-width-mobile | default: 160 }}"
+           data-slide-gap="{{ widget_settings.slide-gap | default: 20 }}">
+           <div class="splide__track">
+              <div class="splide__list">
+                 {% for product in dynamic_col.products limit: widget_settings.count_special_products %}
+                    <div class="splide__slide">
+                       {% include 'product_card', widget_settings: widget_settings %}
+                    </div>
+                 {% endfor %}
+              </div>
+           </div>
+      </div>
+  </div>
+{% else %}
+  <!-- Fallback to standard manual blocks if no dynamic field is set -->
+  {% if data.blocks.size > 0 %}
+    {% for block in data.blocks %}
+      {% if block.collection.products_count_without_cache > 0 %}
+        <div class="special-products js-special-products">
+          {% assign block_name = widget_settings.heading %}
+          <div class="special-products__head">
+             <h3 class="h2 special-products__title heading font-druk">{{ block_name }}</h3>
+             <div class="special-products__slider-controls">
+                <div class="special-products__slider-arrow special-products__slider-arrow-prev js-move-slide">
+                   <span class="class-special-products__slider-arrow-icon icon-arrow-left"></span>
+                </div>
+                <div class="special-products__slider-arrow special-products__slider-arrow-next js-move-slide">
+                   <span class="class-special-products__slider-arrow-icon icon-arrow-right"></span>
+                </div>
+             </div>
+          </div>
+          <div class="splide js-special-products-slider"
+               data-slide-min-width="{{ widget_settings.slide-width }}"
+               data-slide-min-width-mobile="{{ widget_settings.slide-width-mobile }}"
+               data-slide-gap="{{ widget_settings.slide-gap }}">
+               <div class="splide__track">
+                  <div class="splide__list">
+                     {% for product in block.collection.products limit: widget_settings.count_special_products %}
+                        <div class="splide__slide">
+                           {% include 'product_card', widget_settings: widget_settings %}
+                        </div>
+                     {% endfor %}
+                  </div>
+               </div>
+          </div>
+        </div>
+      {% endif %}
+    {% endfor %}
+  {% endif %}
+{% endif %}

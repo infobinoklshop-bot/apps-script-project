@@ -1,0 +1,18 @@
+<!-- SMART WIDGET START -->
+{% assign shadow_handle = collection.fields.polular-cat-prod %}
+{% if shadow_handle != blank and collections[shadow_handle].products.size > 0 %}
+  <div class="container widget-container" style="margin-top: 40px; margin-bottom: 40px;">
+    <div class="widget-title-wrapper">
+      <h2 class="widget-title">Вам может понравиться</h2>
+    </div>
+    
+    <div class="row products-grid">
+      {% for product in collections[shadow_handle].products limit: 4 %}
+        <div class="col-6 col-md-4 col-lg-3">
+           {% include 'product_card' %}
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+{% endif %}
+<!-- SMART WIDGET END -->

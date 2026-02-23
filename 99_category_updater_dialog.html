@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <base target="_top">
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      padding: 20px;
+      color: #333;
+      background-color: #f9f9f9;
+    }
+
+    h3 {
+      margin-top: 0;
+      color: #1976d2;
+      border-bottom: 2px solid #e0e0e0;
+      padding-bottom: 10px;
+    }
+
+    .container {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .section {
+      margin-bottom: 20px;
+    }
+
+    .section-title {
+      font-weight: bold;
+      margin-bottom: 10px;
+      color: #555;
+    }
+
+    .checkbox-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+    }
+
+    .checkbox-item input {
+      margin-right: 10px;
+    }
+
+    .category-list {
+      max-height: 150px;
+      overflow-y: auto;
+      border: 1px solid #ddd;
+      padding: 10px;
+      border-radius: 4px;
+      background: #fff;
+    }
+
+    .category-item {
+      padding: 4px 0;
+      border-bottom: 1px solid #eee;
+      font-size: 13px;
+    }
+
+    .category-item:last-child {
+      border-bottom: none;
+    }
+
+    .buttons {
+      margin-top: 20px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background 0.2s;
+    }
+
+    .btn-cancel {
+      background: #e0e0e0;
+      color: #333;
+    }
+
+    .btn-cancel:hover {
+      background: #d5d5d5;
+    }
+
+    .btn-primary {
+      background: #1976d2;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #1565c0;
+    }
+
+    .btn-primary:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+
+    .loading {
+      display: none;
+      color: #666;
+      margin-top: 10px;
+      font-style: italic;
+    }
+
+    .error-msg {
+      color: #d32f2f;
+      margin-top: 10px;
+      display: none;
+    }
+
+    .success-msg {
+      color: #388e3c;
+      margin-top: 10px;
+      display: none;
+    }
+
+    select {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      margin-top: 5px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h3>🛠️ Массовое обновление категорий</h3>
+
+    <div class="section">
+      <div class="section-title">1. Выбранные категории (<span id="catCount">0</span>):</div>
+      <div style="margin-bottom: 10px;">
+        <button type="button" onclick="loadCategories()" style="padding: 5px 10px; font-size: 12px;">🔄 Загрузить
+          данные</button>
+        <span id="statusLog" style="font-size: 11px; color: #666; margin-left: 10px;">Ожидание...</span>
+      </div>
+      <div class="category-list" id="categoryList">
+        <!-- Заполняется скриптом -->
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">2. Настройки полей:</div>
+      <div class="checkbox-group">
+        <label class="checkbox-item">
+          <input type="checkbox" id="unhideCategory" checked>
+          <span>Открыть категорию (снять галочку "Скрыть")</span>
+        </label>
+        <label class="checkbox-item">
+          <input type="checkbox" id="hideInSlider" checked>
+          <span>Скрыть в слайдере = "да"</span>
+        </label>
+        <label class="checkbox-item">
+          <input type="checkbox" id="hideInMenu" checked>
+          <span>Скрыть в меню = "да"</span>
+        </label>
+        <label class="checkbox-item">
+          <input type="checkbox" id="hideInList" checked>
+          <span>Скрыть в списке = "да"</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">3. Изменить родительскую категорию (опционально):</div>
+      <div style="font-size: 12px; color: #666; margin-bottom: 5px;">Выберите новую родительскую категорию для всех
+        выбранных элементов.</div>
+      <select id="parentSelector">
+        <option value="">-- Не менять --</option>
+        <option value="root">-- Сделать корневой (без родителя) --</option>
+        <option disabled>Загрузка списка...</option>
+      </select>
+    </div>
+
+    <div class="loading" id="loadingStatus">⏳ Выполнение... Пожалуйста, не закрывайте окно.</div>
+    <div class="error-msg" id="errorMsg"></div>
+    <div class="success-msg" id="successMsg"></div>
+
+    <div class="buttons">
+      <button class="btn-cancel" onclick="google.script.host.close()">Закрыть</button>
+      <button class="btn-primary" id="runBtn" onclick="runUpdate()">Выполнить</button>
+    </div>
+  </div>
+
+  <script>
+    // Глобальный обработчик ошибок
+    window.onerror = function (msg, url, line) {
+      const errorMsg = document.getElementById('errorMsg');
+      if (errorMsg) {
+        errorMsg.textContent = 'Ошибка скрипта: ' + msg;
+        errorMsg.style.display = 'block';
+      }
+      console.error('Global error:', msg, url, line);
+    };
+
+    let initialCategories = [];
+    let allCategoriesForSelector = [];
+
+    // Immediate check
+    console.log('🚀 Script tag started');
+    const statusEl = document.getElementById('statusLog');
+    if (statusEl) statusEl.textContent = 'JS Init...';
+
+    document.addEventListener('DOMContentLoaded', function () {
+      console.log('🚀 DOMContentLoaded fired');
+      updateStatus('DOM готов, старт...');
+      loadCategories();
+      loadParentCategories();
+    });
+
+    // Fallback
+    window.onload = function () {
+      console.log('🚀 Window Loaded');
+    };
+
+    function updateStatus(msg) {
+      const el = document.getElementById('statusLog');
+      if (el) el.textContent = msg;
+      console.log('STATUS:', msg);
+    }
+
+    function loadCategories() {
+      updateStatus('⏳ Загрузка категорий...');
+      const list = document.getElementById('categoryList');
+      if (list) list.innerHTML = '<div style="padding:10px; color:#666;">⏳ Загрузка...</div>';
+
+      google.script.run
+        .withSuccessHandler(function (categories) {
+          console.log('✅ Категории получены:', categories.length);
+          updateStatus(`✅ Загружено: ${categories.length}`);
+          initialCategories = categories;
+          renderCategories(initialCategories);
+        })
+        .withFailureHandler(function (error) {
+          console.error('❌ Ошибка:', error);
+          updateStatus('❌ Ошибка: ' + error.message);
+          document.getElementById('errorMsg').textContent = 'Ошибка загрузки: ' + error.message;
+          document.getElementById('errorMsg').style.display = 'block';
+          if (list) list.innerHTML = '<div style="padding:10px; color:red;">Ошибка загрузки</div>';
+        })
+        .getSelectedCategoriesFromSheet();
+    }
+
+    function renderCategories(categories) {
+      const list = document.getElementById('categoryList');
+      const countSpan = document.getElementById('catCount');
+
+      if (!list || !countSpan) return;
+
+      list.innerHTML = '';
+      countSpan.textContent = categories ? categories.length : 0;
+
+      if (!categories || categories.length === 0) {
+        list.innerHTML = '<div style="padding:10px; color:#999;">Нет выбранных категорий</div>';
+        return;
+      }
+
+      categories.forEach((cat) => {
+        const div = document.createElement('div');
+        div.className = 'category-item';
+        div.innerHTML = `
+            <strong>${cat.title}</strong> (ID: ${cat.id})
+          `;
+        list.appendChild(div);
+      });
+    }
+
+    function loadParentCategories() {
+      google.script.run
+        .withSuccessHandler(function (categories) {
+          allCategoriesForSelector = categories;
+          const select = document.getElementById('parentSelector');
+          // Сохраняем первые две опции
+          const defaultOpts = [select.options[0], select.options[1]];
+          select.innerHTML = '';
+          select.appendChild(defaultOpts[0]);
+          select.appendChild(defaultOpts[1]);
+
+          // Явно устанавливаем "Не менять" по умолчанию
+          select.value = "";
+
+          categories.forEach(cat => {
+            const option = document.createElement('option');
+            option.value = cat.id;
+            option.text = cat.title;
+            select.appendChild(option);
+          });
+
+          // Если выбрана только одна категория, пытаемся предустановить текущего родителя
+          if (initialCategories.length === 1) {
+            const currentParentId = initialCategories[0].parentId;
+            if (currentParentId) {
+              // Проверяем, есть ли такой родитель в списке
+              const parentOption = select.querySelector(`option[value="${currentParentId}"]`);
+              if (parentOption) {
+                select.value = currentParentId;
+                console.log(`🎯 Предустановлен родитель: ${currentParentId}`);
+              }
+            } else {
+              // Если родителя нет, возможно это корневая категория
+              // Но лучше оставить "Не менять", чтобы случайно не сбросить
+            }
+          }
+        })
+        .getAllCategoriesForSelector();
+    }
+
+    function runUpdate() {
+      const btn = document.getElementById('runBtn');
+      const loading = document.getElementById('loadingStatus');
+      const errorMsg = document.getElementById('errorMsg');
+      const successMsg = document.getElementById('successMsg');
+
+      // Сброс статусов
+      errorMsg.style.display = 'none';
+      successMsg.style.display = 'none';
+
+      // Сбор настроек
+      const settings = {
+        unhideCategory: document.getElementById('unhideCategory').checked,
+        hideInSlider: document.getElementById('hideInSlider').checked,
+        hideInMenu: document.getElementById('hideInMenu').checked,
+        hideInList: document.getElementById('hideInList').checked,
+        newParentId: document.getElementById('parentSelector').value
+      };
+
+      // Сбор ID категорий
+      const categoryIds = initialCategories.map(c => c.id);
+
+      // UI блокировка
+      btn.disabled = true;
+      loading.style.display = 'block';
+
+      google.script.run
+        .withSuccessHandler(function (result) {
+          loading.style.display = 'none';
+          btn.disabled = false;
+
+          if (result.success) {
+            successMsg.textContent = result.message;
+            successMsg.style.display = 'block';
+          } else {
+            errorMsg.textContent = 'Ошибка: ' + result.error;
+            errorMsg.style.display = 'block';
+          }
+        })
+        .withFailureHandler(function (error) {
+          loading.style.display = 'none';
+          btn.disabled = false;
+          errorMsg.textContent = 'Системная ошибка: ' + error.message;
+          errorMsg.style.display = 'block';
+        })
+        .processCategoryUpdatesFromDialog(categoryIds, settings);
+    }
+  </script>
+</body>
+
+</html>

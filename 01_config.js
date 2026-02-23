@@ -15,20 +15,57 @@ const INSALES_CONFIG = {
   apiKey: '63798fce31db4378484c6d6a8afd8674',
   password: 'd3e999e5e5f48ff73415e1ad561f927f',
   shop: 'binokl.shop',
-  
+
   // ИСПРАВЛЕНО: правильный домен админки InSales
   adminDomain: 'myshop-on665.myinsales.ru',
   adminPath: '/admin2',  // ВАЖНО: admin2, не admin!
-  
+
   get baseUrl() {
     return `https://${this.shop}`;
   },
-  
+
   // Новый геттер для ссылок на админку
   get adminBaseUrl() {
     return `https://${this.adminDomain}${this.adminPath}`;
   }
 };
+
+// ========================================
+// ГЛОБАЛЬНЫЕ ФУНКЦИИ АВТОРИЗАЦИИ
+// ========================================
+
+/**
+ * Получает учетные данные InSales (Синхронная версия)
+ * Централизованная функция для всего проекта
+ */
+function getInsalesCredentialsSync() {
+  try {
+    const config = getInsalesConfig();
+
+    if (!config || !config.apiKey || !config.password || !config.shop) {
+      throw new Error('Учетные данные InSales не настроены в 01_config.gs');
+    }
+
+    return {
+      apiKey: config.apiKey,
+      password: config.password,
+      shop: config.shop,
+      baseUrl: config.baseUrl
+    };
+  } catch (error) {
+    console.error('❌ Ошибка получения учетных данных:', error);
+    return null;
+  }
+}
+
+/**
+ * УСТАРЕВШАЯ ФУНКЦИЯ - Оставлена для совместимости
+ * Если где-то остался старый вызов getInSalesCredentials(), он попадет сюда
+ */
+function getInSalesCredentials() {
+  console.warn('⚠️ Используется устаревшая функция getInSalesCredentials. Пожалуйста, обновите код на getInsalesCredentialsSync.');
+  return getInsalesCredentialsSync();
+}
 
 // ========================================
 // НАСТРОЙКИ OPENAI
@@ -40,16 +77,54 @@ const OPENAI_CONFIG = {
 
   // Модель для генерации (можно менять)
   model: 'gpt-4o-mini',
-  
+
   // Температура генерации (0.0 - 1.0)
   // Меньше = более предсказуемо, больше = более креативно
   temperature: 0.7,
-  
+
   // Максимум токенов в ответе
   maxTokens: 4000
 };
 
+// ========================================
+// НАСТРОЙКИ GEMINI (GOOGLE)
+// ========================================
+
+// ========================================
+// НАСТРОЙКИ GEMINI (GOOGLE)
+// ========================================
+
+const GOOGLE_GEMINI_V2_CONFIG = {
+  apiKey: 'AIzaSyD7xd_gvG7XvMOR97Iw9aZbTYgs1q5RTRM',
+  model: 'gemini-3-pro-preview',
+  temperature: 0.7,
+  maxOutputTokens: 8192
+};
+
+const GOOGLE_GEMINI_IMAGE_CONFIG = {
+  apiKey: 'AIzaSyD7xd_gvG7XvMOR97Iw9aZbTYgs1q5RTRM', // Используем тот же ключ
+  model: 'gemini-3-pro-image-preview',
+  driveFolder: 'AI_Generated_Banners'
+};
+
 const CATEGORY_DESCRIPTION_ASSISTANT_ID = 'asst_qVFYH8Q5qgzMKsvOOzwnAuHN';
+
+// ========================================
+// НАСТРОЙКИ YANDEX METRICA
+// ========================================
+
+const YANDEX_METRICA_CONFIG = {
+  // ID счетчика (из вашего скриншота)
+  counterId: '41613924',
+
+  // OAuth токен (нужно получить)
+  // ВАЖНО: Токен должен иметь права на Метрику (ym:r:read) И Вебмастер (webmaster:host:information, webmaster:report:analytics)
+  // Если Вебмастер выдает ошибку 403, обновите токен, добавив права в https://oauth.yandex.ru/
+  oauthToken: 'y0__xDkppDPARj4jzwgneL2xRXiGf55eP6f3E44-SD7tOQGB29BSw',
+
+  // Базовый URL API
+  baseUrl: 'https://api-metrika.yandex.net/stat/v1/data'
+};
 
 // ========================================
 // НАСТРОЙКИ СЕМАНТИКИ (ОПЦИОНАЛЬНО)
@@ -58,10 +133,10 @@ const CATEGORY_DESCRIPTION_ASSISTANT_ID = 'asst_qVFYH8Q5qgzMKsvOOzwnAuHN';
 const SEMANTICS_CONFIG = {
   // Выберите сервис: 'serpstat', 'ahrefs', 'semrush' или null
   service: null,  // Если null - ручной ввод позиций
-  
+
   // API ключ для выбранного сервиса
   apiKey: '',
-  
+
   // Регион для проверки (для Serpstat)
   region: 'g_ru'  // Google Россия
 };
@@ -73,18 +148,28 @@ const SEMANTICS_CONFIG = {
 const POSITIONS_CONFIG = {
   // Автоматическая проверка позиций (если true - нужен API)
   autoCheck: false,
-  
+
   // Сервис для проверки позиций: null, 'serpstat', 'serankings'
   service: null,
-  
+
   // API ключ для сервиса проверки позиций
   apiKey: '',
-  
+
   // Глубина проверки (ТОП-10, ТОП-30, ТОП-100)
   depth: 100,
-  
+
   // Поисковая система по умолчанию
-  defaultSearchEngine: 'yandex'  // 'yandex' или 'google'
+  defaultSearchEngine: 'yandex',  // 'yandex' или 'google'
+
+  // Регионы для Вордстата
+  WORDSTAT_REGIONS: {
+    '0': 'Весь мир',
+    '225': 'Россия',
+    '213': 'Москва',
+    '1': 'Москва и область',
+    '2': 'Санкт-Петербург',
+    '10174': 'Санкт-Петербург и область'
+  }
 };
 
 // ========================================
@@ -95,22 +180,22 @@ const APP_CONFIG = {
   // Название приложения
   name: 'InSales Manager',
   version: '2.0',
-  
+
   // Максимальное количество товаров для загрузки за раз
   maxProductsPerPage: 250,
-  
+
   // Максимальное количество категорий для загрузки
   maxCategoriesPages: 20,
-  
+
   // Задержка между API запросами (мс)
   apiDelay: 500,
-  
+
   // Количество повторных попыток при ошибке API
   apiRetries: 3,
-  
+
   // Логирование в лист
   enableSheetLogging: true,
-  
+
   // Максимальное количество записей в логе
   maxLogRecords: 1000
 };
@@ -123,7 +208,9 @@ const CATEGORY_SHEETS = {
   MAIN_LIST: 'Категории — Список',
   DETAIL_PREFIX: 'Категория — ',
   KEYWORDS: 'Ключевые слова',
+  SEMANTICS: 'Семантика',
   LSI_WORDS: 'LSI и тематика',
+  IMPORT_QA: 'Импорт Q&A',
   PRODUCTS_CATALOG: 'Каталог для подбора',
   POSITIONS_HISTORY: 'История позиций'
 };
@@ -145,7 +232,17 @@ const MAIN_LIST_COLUMNS = {
   SEO_STATUS: 10,           // J
   AI_STATUS: 11,            // K
   LAST_UPDATED: 12,         // L
-  ADMIN_LINK: 13            // M
+  ADMIN_LINK: 13,           // M
+  VISITS: 14,               // N - Визиты из Яндекс.Метрики
+  BOUNCE_RATE: 15,          // O - Отказы
+  ORDERS: 16,               // P - Заказы (Цель 54410371 - Оформление заказа)
+  GSC_IMPRESSIONS: 17,      // Q - Показы из Google Search Console (GSC)
+
+  // Показы из Яндекс.Вебмастера (ВРЕМЕННО ОТКЛЮЧЕНО из-за проблем с OAuth)
+  WEBMASTER_IMPRESSIONS: null, // Было 18 (R)
+
+  // Период сбора данных
+  PERIOD: 19                // S - Период сбора статистики
 };
 
 // ========================================
@@ -196,7 +293,7 @@ const DETAIL_SHEET_SECTIONS = {
   TITLE_CELL: 'B3',
   URL_CELL: 'B4',
   PARENT_PATH_CELL: 'B5',
-  
+
   SEO_START: 12,
   SEO_TITLE_CELL: 'B13',
   SEO_DESCRIPTION_CELL: 'B14',
@@ -253,7 +350,8 @@ const CATEGORY_API_ENDPOINTS = {
   COLLECTION_BY_ID: '/admin/collections/{id}.json',
   COLLECTION_PRODUCTS: '/admin/products.json?collection_id={id}',
   UPDATE_COLLECTION: '/admin/collections/{id}.json',
-  PRODUCTS: '/admin/products.json'
+  PRODUCTS: '/admin/products.json',
+  COLLECTS: '/admin/collects.json'
 };
 
 // ========================================
@@ -268,14 +366,14 @@ const SEMANTICS_API = {
       search_volume: 'search_analytics_overview'
     }
   },
-  
+
   AHREFS: {
     endpoint: 'https://apiv2.ahrefs.com/',
     methods: {
       keywords: 'keywords-explorer/v2/keywords'
     }
   },
-  
+
   SEMRUSH: {
     endpoint: 'https://api.semrush.com/',
     methods: {
@@ -371,7 +469,7 @@ function getOpenAIConfig() {
   // СНАЧАЛА пробуем взять из Script Properties
   const scriptProps = PropertiesService.getScriptProperties();
   const apiKeyFromProps = scriptProps.getProperty('OPENAI_API_KEY');
-  
+
   // Если есть в Properties - используем его
   if (apiKeyFromProps) {
     return {
@@ -381,7 +479,7 @@ function getOpenAIConfig() {
       maxTokens: OPENAI_CONFIG.maxTokens || 4000
     };
   }
-  
+
   // Иначе берем из константы
   return OPENAI_CONFIG;
 }
@@ -404,18 +502,18 @@ function getPositionsConfig() {
  * Проверяет, настроен ли OpenAI
  */
 function isOpenAIConfigured() {
-  return OPENAI_CONFIG.apiKey && 
-         OPENAI_CONFIG.apiKey.length > 20 &&
-         OPENAI_CONFIG.apiKey.startsWith('YOUR_OPENAI_API_KEY_HERE');
+  return OPENAI_CONFIG.apiKey &&
+    OPENAI_CONFIG.apiKey.length > 20 &&
+    OPENAI_CONFIG.apiKey.startsWith('YOUR_OPENAI_API_KEY_HERE');
 }
 
 /**
  * Проверяет, настроен ли InSales
  */
 function isInsalesConfigured() {
-  return INSALES_CONFIG.apiKey && 
-         INSALES_CONFIG.password && 
-         INSALES_CONFIG.shop;
+  return INSALES_CONFIG.apiKey &&
+    INSALES_CONFIG.password &&
+    INSALES_CONFIG.shop;
 }
 
 /**
@@ -423,7 +521,7 @@ function isInsalesConfigured() {
  */
 function showAPIKeysSetup() {
   const ui = SpreadsheetApp.getUi();
-  
+
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -497,16 +595,16 @@ function showAPIKeysSetup() {
         
         <div class="section">
           <h4>OpenAI API</h4>
-          ${isOpenAIConfigured() ? 
-            `<div class="success">✅ Настроено</div>
+          ${isOpenAIConfigured() ?
+      `<div class="success">✅ Настроено</div>
              <div class="key-info">API Key: ${OPENAI_CONFIG.apiKey.substring(0, 20)}...</div>` :
-            `<div class="error">❌ Не настроено</div>
+      `<div class="error">❌ Не настроено</div>
              <div class="warning">
                Откройте файл <strong>01_config.gs</strong> и замените:<br><br>
                <code>apiKey: 'sk-proj-ВАШ_КЛЮЧ_OPENAI_СЮДА'</code><br><br>
                на ваш реальный ключ OpenAI
              </div>`
-          }
+    }
           <button onclick="testOpenAI()" ${!isOpenAIConfigured() ? 'disabled' : ''}>
             Проверить подключение
           </button>
@@ -514,18 +612,18 @@ function showAPIKeysSetup() {
         
         <div class="section">
           <h4>Семантика (опционально)</h4>
-          ${SEMANTICS_CONFIG.service ? 
-            `<div class="success">✅ Настроено: ${SEMANTICS_CONFIG.service}</div>` :
-            `<div class="warning">⚠️ Не настроено - будет использоваться только OpenAI для LSI</div>`
-          }
+          ${SEMANTICS_CONFIG.service ?
+      `<div class="success">✅ Настроено: ${SEMANTICS_CONFIG.service}</div>` :
+      `<div class="warning">⚠️ Не настроено - будет использоваться только OpenAI для LSI</div>`
+    }
         </div>
         
         <div class="section">
           <h4>Проверка позиций</h4>
-          ${POSITIONS_CONFIG.service ? 
-            `<div class="success">✅ Настроено: ${POSITIONS_CONFIG.service}</div>` :
-            `<div class="warning">⚠️ Не настроено - будет ручной ввод позиций</div>`
-          }
+          ${POSITIONS_CONFIG.service ?
+      `<div class="success">✅ Настроено: ${POSITIONS_CONFIG.service}</div>` :
+      `<div class="warning">⚠️ Не настроено - будет ручной ввод позиций</div>`
+    }
         </div>
         
         <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
@@ -552,11 +650,11 @@ function showAPIKeysSetup() {
       </body>
     </html>
   `;
-  
+
   const htmlOutput = HtmlService.createHtmlOutput(htmlContent)
     .setWidth(650)
     .setHeight(600);
-  
+
   ui.showModalDialog(htmlOutput, 'Настройка API');
 }
 // ========================================
@@ -698,4 +796,173 @@ const SECTION_CHARACTERISTICS = {
     'Вес, г',
     'Режимы работы'
   ]
+};
+
+// ========================================
+// НАСТРОЙКИ SEO-ТЕГОВ
+// ========================================
+
+const SEO_TAGS_CONFIG = {
+  // Температуры по этапам
+  TEMPERATURES: {
+    SINGLE: 0.5,      // Режим "сразу" - баланс
+    STAGE_1: 0.3,     // Аналитик - точность
+    STAGE_2: 0.4,     // Копирайтер - дисциплина + вариативность LSI
+    STAGE_3: 0.1      // Редактор - консистентность
+  },
+
+  // Retry для API
+  MAX_RETRIES: 3,
+  RETRY_DELAYS: [2000, 4000, 8000], // Exponential backoff: 2s, 4s, 8s
+
+  // Задержки между запросами
+  DELAY_BETWEEN_API_CALLS: 700,    // мс между запросами к API
+  DELAY_BETWEEN_ROWS: 1000,        // мс между строками
+
+  // Ячейки детального листа категории
+  DETAIL_SHEET_CELLS: {
+    CATEGORY_ID: 'B2',          // ID категории (ключ для поиска)
+    CATEGORY_NAME: 'B3',        // Название категории
+    SEO_TITLE: 'B13',           // Текущий Title (результат сюда же)
+    META_DESC: 'B14',           // Текущий Description (результат сюда же)
+    H1: 'B15',                  // H1 заголовок
+    KEYWORDS: 'B16',            // Ключевые слова
+    DESCRIPTION_START: 'B17',   // Начало описания
+    GEMINI_FEEDBACK: 'D11'      // Замечания для Gemini
+  },
+
+  // Лист для массовой обработки
+  MASS_SHEET_NAME: 'SEO-теги',
+  MASS_DATA_START_ROW: 2,       // Первая строка с данными
+
+  // Индексы столбцов листа "SEO-теги" (1-based)
+  // Соответствует реальной структуре существующего листа
+  MASS_COLUMNS: {
+    CHECKBOX: 1,           // A: ☑️
+    ID: 2,                 // B: ID категории
+    PAGE_NAME: 3,          // C: Название страницы
+    URL: 4,                // D: URL
+    ADMIN_LINK: 5,         // E: Админка
+    PAGE_CONTENT: 6,       // F: Содержание страницы
+    SEMANTIC_CORE: 7,      // G: Семантическое ядро
+    LSI: 8,                // H: LSI
+    QA: 9,                 // I: Вопрос - Ответ
+    COMPETITORS_TITLE: 10, // J: Title конкурентов
+    COMPETITORS_DESC: 11,  // K: Description конкурентов
+    USP: 12,               // L: Наше УТП
+    PROMPT_SINGLE: 13,     // M: Общий запрос
+    PROMPT_STAGE_1: 14,    // N: Запрос: Этап 1
+    PROMPT_STAGE_2: 15,    // O: Запрос: Этап 2
+    PROMPT_STAGE_3: 16,    // P: Запрос: Этап 3
+    RESULT_TITLE: 17,      // Q: Title
+    RESULT_DESC: 18,       // R: Description
+    SHORT_DESC: 19,        // S: Краткое описание
+    PRODUCT_CRITERIA: 20,  // T: Запрос: подбор товаров
+    PRODUCTS_RESULT: 21    // U: Товары
+  },
+
+  // Настройки подбора товаров
+  EXPORT_SHEET_NAME: 'Выгрузка',       // Лист с CSV-выгрузкой InSales
+  PRODUCTS_BATCH_SIZE: 30,              // Товаров в одном запросе к AI (100 = MAX_TOKENS ошибка)
+
+  // Пайплайн автоматической генерации
+  PIPELINE_PROGRESS_KEY: 'seo_pipeline_progress',
+  LOAD_CHECKED_PROGRESS_KEY: 'seo_load_checked_progress',
+  MANDATORY_COLUMNS: [3, 6],            // C (PAGE_NAME), F (PAGE_CONTENT) — обязательные данные
+  MINUS_WORDS_SHEET_NAME: 'Минус-слова' // Лист со списком минус-слов (столбец A)
+};
+
+// ========================================
+// НАСТРОЙКИ ARSENKIN API
+// ========================================
+
+const ARSENKIN_CONFIG = {
+  API_TOKEN: '668ad513b50296dd81721ee6ced7b517',
+  BASE_URL: 'https://arsenkin.ru/api/tools/',
+
+  // Таймауты и задержки
+  DELAY_BETWEEN_SUBMITS_MS: 2000,   // Между отправками задач (мс)
+  POLL_INTERVAL_MS: 10000,           // Интервал проверки статуса (мс)
+  EXECUTION_SAFETY_MS: 330000,       // 5.5 мин (запас 30 сек до таймаута GAS)
+
+  // Retry
+  MAX_RETRIES: 3,
+  RETRY_DELAYS: [2000, 4000, 8000],
+
+  // Настройки инструмента "Парсинг фраз Wordstat" (подбор ключевиков)
+  WORDSTAT_PHRASES: {
+    tools_name: 'wordstat',
+    type: 2,                // 2 = парсинг фраз
+    device: '',             // Все устройства
+    region: 213,            // Москва
+    minus_words: [],        // Минус-слова (пусто)
+    is_clear_minus: true,   // Удалять фразы с минус-словами
+    is_right: false,        // Не собирать правую колонку
+    is_clear: true          // Удалить '+' из ключевых фраз
+  },
+
+  // Настройки инструмента "Сбор частотности Wordstat" (для существующих ключей)
+  WORDSTAT_FREQUENCY: {
+    tools_name: 'wordstat',
+    type: 1,                // 1 = сбор частотности
+    device: '',             // Все устройства
+    regions: [213],         // Москва
+    ws: ['base']            // Базовая частотность (широкое соответствие)
+  },
+
+  // Настройки инструмента "Парсинг тегов Title/Description"
+  CHECK_H: {
+    tools_name: 'check-h',
+    mode: 'key',            // По ключевому запросу
+    se: 1,                  // 1 = Яндекс
+    region: 213,            // Москва
+    depth: 10,              // ТОП-10
+    pause: 1
+  },
+
+  // Ключи для Script Properties (сохранение прогресса)
+  PROGRESS_KEYS: {
+    WORDSTAT_PHRASES: 'arsenkin_wordstat_phrases_progress',
+    WORDSTAT_FREQ: 'arsenkin_wordstat_freq_progress',
+    CHECK_H: 'arsenkin_check_h_progress',
+    CLUSTERING: 'arsenkin_clustering_progress',
+    SEARCH_HIGHLIGHTS: 'arsenkin_highlights_progress'
+  },
+
+  // Настройки инструмента "Кластеризация"
+  CLUSTERING: {
+    tools_name: 'clustering',
+    se: 1,                  // 1 = Яндекс, 2 = Google
+    region: 213,            // Москва
+    threshold: 3,           // Порог кластеризации (стандартный - 3)
+    group: 'hard',          // Метод (hard/soft)
+    count: 3                // Степень группировки (как на скриншоте пользователя)
+  },
+
+  // Настройки инструмента "Парсинг подсветок" (LSI-слова из выдачи)
+  SEARCH_HIGHLIGHTS: {
+    tools_name: 'sp',
+    se: 1,                  // 1 = Яндекс
+    region: 213,            // Москва
+    depth: 50               // Глубина проверки
+  }
+};
+
+// ========================================
+// ПРОМПТЫ ДЛЯ SEO-ТЕГОВ
+// ========================================
+
+const SEO_TAGS_PROMPTS = {
+  // Системная инструкция для Gemini (общая для всех режимов)
+  SYSTEM: `Ты - профессиональный SEO-специалист интернет-магазина оптических приборов Binokl.shop.
+Твоя задача - создавать Title и Description для страниц категорий.
+Формат ответа: Title: [текст] Description: [текст]`,
+
+  // Системные инструкции для этапов поэтапной генерации
+  STAGE_1_SYSTEM: `Ты — ведущий SEO-аналитик и эксперт по поисковому продвижению в Google и Яндекс.`,
+  STAGE_2_SYSTEM: `Ты — экспертный SEO-копирайтер и контент-маркетолог, мастер LSI-оптимизации.`,
+  STAGE_3_SYSTEM: `Ты — специалист по финальному оформлению поисковой выдачи.`
+
+  // Промпты для этапов задаются ТОЛЬКО в ячейках листа "SEO-теги" (столбцы M, N, O, P).
+  // Если ячейка пуста — генерация прерывается с ошибкой.
 };

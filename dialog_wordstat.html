@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <base target="_top">
+    <link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons1.css">
+    <style>
+        body {
+            padding: 15px;
+            font-family: 'Google Sans', Roboto, Arial, sans-serif;
+        }
+
+        .block {
+            margin-bottom: 20px;
+            border: 1px solid #e0e0e0;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .block-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .radio-group {
+            margin-bottom: 10px;
+        }
+
+        .radio-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 150px;
+            resize: vertical;
+            margin-bottom: 10px;
+            font-family: monospace;
+        }
+
+        select {
+            width: 100%;
+        }
+
+        .checkbox-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .buttons {
+            margin-top: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .action-button {
+            background-color: #1a73e8;
+            color: white;
+        }
+
+        .secondary-button {
+            background-color: #f1f3f4;
+            color: #3c4043;
+            border: 1px solid #dadce0;
+        }
+
+        .error {
+            color: #d93025;
+            margin-top: 10px;
+            font-size: 12px;
+        }
+
+        .hint {
+            color: #5f6368;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+
+        #loading {
+            display: none;
+            color: #1a73e8;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- 1. Тип проверки -->
+    <div class="block">
+        <div class="block-title">1. Тип проверки:</div>
+        <div class="radio-group">
+            <label><input type="radio" name="checkType" value="frequency" checked> Сбор частотности (популярности)
+                ключевых фраз</label>
+            <label><input type="radio" name="checkType" value="parsing" disabled> Парсинг ключевых фраз (в
+                разработке)</label>
+        </div>
+    </div>
+
+    <!-- 2. Ключевые запросы -->
+    <div class="block">
+        <div class="block-title">2. Ключевые запросы (максимум - 10 000):</div>
+        <textarea id="keywords" placeholder="Каждое ключевое слово с новой строки..."></textarea>
+        <div style="text-align: right;">
+            <button class="secondary-button" onclick="loadFromMetrica()">📥 Загрузить из Метрики</button>
+        </div>
+        <div id="metricaStatus" class="hint"></div>
+    </div>
+
+    <!-- 3. Регион -->
+    <div class="block">
+        <div class="block-title">3. Выберите регион:</div>
+        <select id="region">
+            <option value="0">Весь мир [0]</option>
+            <option value="225">Россия [225]</option>
+            <option value="213">Москва [213]</option>
+            <option value="1">Москва и область [1]</option>
+            <option value="2">Санкт-Петербург [2]</option>
+            <option value="10174">Санкт-Петербург и область [10174]</option>
+        </select>
+    </div>
+
+    <!-- 4. Настройка сбора -->
+    <div class="block">
+        <div class="block-title">4. Настройка сбора частотности:</div>
+        <div class="checkbox-group">
+            <label><input type="checkbox" id="freq_broad" checked disabled> ключевая фраза (Базовая)</label>
+            <label><input type="checkbox" id="freq_quote" checked> "ключевая фраза" (Фразовая)</label>
+            <label><input type="checkbox" id="freq_excl"> "!ключевая !фраза" (Точная)</label>
+            <label><input type="checkbox" id="freq_bracket"> "[!ключевая !фраза]" (Фиксированный порядок)</label>
+        </div>
+    </div>
+
+    <div class="buttons">
+        <div id="loading">⏳ Обработка... Пожалуйста, подождите.</div>
+        <button class="action-button" onclick="startCheck()">Начать проверку</button>
+    </div>
+
+    <div id="error" class="error"></div>
+
+    <script>
+        function loadFromMetrica() {
+            const btn = document.querySelector('button[onclick="loadFromMetrica()"]');
+            const status = document.getElementById('metricaStatus');
+            btn.disabled = true;
+            status.textContent = 'Загрузка из Метрики...';
+
+            google.script.run
+                .withSuccessHandler(function (keywords) {
+                    const textarea = document.getElementById('keywords');
+                    if (keywords && keywords.length > 0) {
+                        textarea.value = keywords.join('\n');
+                        status.textContent = 'Загружено ' + keywords.length + ' фраз.';
+                    } else {
+                        status.textContent = 'Фразы не найдены или нет данных.';
+                    }
+                    btn.disabled = false;
+                })
+                .withFailureHandler(function (err) {
+                    status.textContent = 'Ошибка: ' + err.message;
+                    btn.disabled = false;
+                })
+                .getMetricaKeywordsForActiveCategory();
+        }
+
+        function startCheck() {
+            const keywords = document.getElementById('keywords').value;
+            if (!keywords.trim()) {
+                document.getElementById('error').textContent = 'Введите ключевые слова!';
+                return;
+            }
+
+            const region = document.getElementById('region').value;
+            const settings = {
+                broad: true,
+                quote: document.getElementById('freq_quote').checked,
+                excl: document.getElementById('freq_excl').checked,
+                bracket: document.getElementById('freq_bracket').checked
+            };
+
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('error').textContent = '';
+            const btns = document.querySelectorAll('button');
+            btns.forEach(b => b.disabled = true);
+
+            google.script.run
+                .withSuccessHandler(function (res) {
+                    google.script.host.close();
+                })
+                .withFailureHandler(function (err) {
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('error').textContent = 'Ошибка: ' + err.message;
+                    btns.forEach(b => b.disabled = false);
+                })
+                .processWordstatRequest(keywords, region, settings);
+        }
+    </script>
+</body>
+
+</html>

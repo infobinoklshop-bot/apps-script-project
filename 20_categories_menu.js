@@ -9,17 +9,22 @@
  */
 function addFullCategoryMenu(mainMenu) {
   const categoryMenu = SpreadsheetApp.getUi().createMenu('📁 Категории');
-  
+
   // Основные операции
   categoryMenu
     .addItem('🏗️ Создать структуру листов', 'createCategoryManagementStructure')
     .addSeparator()
     .addItem('📥 Загрузить все категории', 'loadCategoriesWithHierarchy')
     .addItem('🔍 Найти и открыть категорию', 'showCategorySearchDialog')
-    .addItem('➕ Создать категорию', 'showCreateCategoryDialog')  // НОВОЕ!
+    .addItem('➕ Создать категорию', 'showCreateCategoryDialog')
     .addItem('🔄 Обновить данные категорий', 'updateCategoriesData')
+    .addSeparator()
+    .addItem('✅ Отметить выделенные', 'checkSelectedRows')
+    .addItem('❌ Снять выделение', 'uncheckSelectedRows')
+    .addItem('🛠️ Массовое обновление', 'showCategoryUpdaterDialog')
+    .addItem('🗑️ Удалить категорию (с переносом)', 'deleteSelectedCategory')
     .addSeparator();
-  
+
   // Семантическое ядро + LSI
   const semanticsMenu = SpreadsheetApp.getUi().createMenu('🔑 Семантика')
     .addItem('⚙️ Настроить API', 'configureSemanticsAPI')
@@ -29,18 +34,29 @@ function addFullCategoryMenu(mainMenu) {
     .addItem('🤖 Распределить (AI)', 'distributeKeywordsForActiveCategory')
     .addSeparator()
     .addItem('📋 Показать ключевики', 'showKeywordsSheet')
-    .addItem('📋 Показать LSI', 'showLSISheet');  // НОВОЕ
-  
+    .addItem('📋 Показать LSI', 'showLSISheet')
+    .addSeparator()
+    .addItem('📊 Трафик (Яндекс+Google)', 'updateCategoryVisitsStats')
+    .addItem('📥 Импорт запросов (GSC/Метрика)', 'importMissingKeywordsForCategory')
+    .addItem('🐞 Debug: Бинокль', 'debugSpecificPhrase')
+    .addItem('🔍 Debug: Проверить URL', 'debugUrlStats');
+
   categoryMenu.addSubMenu(semanticsMenu);
-  
+
   // AI генерация
   const aiMenu = SpreadsheetApp.getUi().createMenu('🤖 AI Генерация')
     .addItem('🔍 Анализ категории', 'analyzeActiveCategoryFromMenu')
     .addSeparator()
     .addItem('🎯 Генерировать SEO', 'generateSEOForActiveCategory')
-    .addItem('📄 Генерировать описание', 'generateDescriptionForActiveCategory')
+    .addItem('📝 Создать описание (Gemini)', 'generateDescriptionWithGemini')
+    .addItem('🎨 Создать баннеры (Gemini)', 'onGenerateBanners')
     .addSeparator()
-    .addItem('🎨 Генерировать изображения', 'generateCategoryImagesWithAI');
+    .addItem('🤖 Генерировать описание (OpenAI)', 'generateDescriptionForActiveCategory')
+    .addSeparator()
+    .addItem('🎨 Генерировать изображения', 'generateCategoryImagesWithAI')
+    .addSeparator()
+    .addItem('🏷️ SEO-теги (сразу)', 'generateSeoTagsForActiveCategory')
+    .addItem('🏷️ SEO-теги (поэтапно)', 'generateSeoTagsStagedForActiveCategory');
 
   categoryMenu.addSubMenu(aiMenu);
 
@@ -56,7 +72,7 @@ function addFullCategoryMenu(mainMenu) {
     .addItem('👁️ Предпросмотр плитки', 'showTilesPreviewManual');
 
   categoryMenu.addSubMenu(tilesMenu);
-  
+
   // НОВОЕ: Отслеживание позиций
   const positionsMenu = SpreadsheetApp.getUi().createMenu('📊 Позиции')
     .addItem('⚙️ Настроить маркерный запрос', 'setupMarkerQuery')
@@ -64,28 +80,81 @@ function addFullCategoryMenu(mainMenu) {
     .addSeparator()
     .addItem('📈 Показать динамику', 'showPositionsDynamicsReport')
     .addItem('📋 История позиций', 'showPositionsHistorySheet');
-  
+
   categoryMenu.addSubMenu(positionsMenu);
 
-    // Управление товарами
+  // SEO-теги (массовая обработка) — разбито на подменю
+  const ui = SpreadsheetApp.getUi();
+  const seoTagsMenu = ui.createMenu('🏷️ SEO-теги (массово)')
+    .addItem('📋 Создать лист', 'createSeoTagsSheet')
+    .addItem('✅ Отметить выделенные', 'checkSelectedRowsSeoTags')
+    .addItem('❌ Снять выделение', 'uncheckSelectedRowsSeoTags')
+    .addSeparator()
+    .addItem('🔄 Загрузить все категории', 'updateCategoriesToSeoTags')
+    .addItem('🔄 Загрузить отмеченные', 'loadSeoDataForCheckedRows')
+    .addSeparator()
+    .addSubMenu(ui.createMenu('🚀 Пайплайн')
+      .addItem('Фаза 1: Данные → Ключевики → Кластеризация', 'runSeoPipelinePhase1')
+      .addItem('Фаза 2: Частотность → Конкуренты → SEO-теги', 'runSeoPipelinePhase2')
+      .addItem('🧹 Сбросить прогресс', 'clearPipelineProgress'))
+    .addSubMenu(ui.createMenu('✍️ Генерация')
+      .addItem('📝 Описание категории', 'generateCategoryDescriptionMass')
+      .addItem('🔄 SEO-теги (3 запроса)', 'generateSeoTagsStagedMass')
+      .addItem('📤 Отправить в InSales', 'pushSeoTagsToInSales')
+      .addItem('🗑️ Очистить результаты', 'clearSeoTagsResults'))
+    .addSubMenu(ui.createMenu('📊 Арсенкин')
+      .addItem('🔍 Парсинг ключевиков (Wordstat)', 'importKeywordsFromArsenkin')
+      .addItem('📈 Сбор частотности (Wordstat)', 'collectFrequencyFromArsenkin')
+      .addItem('📊 Импорт тегов конкурентов', 'importCompetitorTagsFromArsenkin')
+      .addItem('📥 Загрузить Q&A из листа импорта', 'importQaFromSheet')
+      .addItem('🔍 Подсветить минус-слова', 'highlightMinusWordsInCheckedRows')
+      .addItem('🚫 Удалить минус-слова', 'deleteMinusWordsFromCheckedRows')
+      .addItem('ℹ️ Статус импорта', 'showArsenkinImportStatus')
+      .addItem('🧹 Очистить прогресс', 'clearArsenkinProgress'))
+    .addSubMenu(ui.createMenu('🧩 Кластеризация')
+      .addItem('🧩 Кластеризация (Arsenkin)', 'clusterCategoriesWithArsenkin')
+      .addItem('🔗 Объединить кластеры', 'combineSelectedClusters'))
+    .addSubMenu(ui.createMenu('🛒 Товары')
+      .addItem('🔍 Подобрать товары (диалог)', 'showProductSelectionDialog')
+      .addItem('🧠 Критерии подбора (AI, массово)', 'generateProductCriteriaMass')
+      .addItem('🔍 Подобрать (фильтр, массово)', 'selectProductsByCriteriaMass')
+      .addItem('📤 Отправить товары в InSales', 'sendSelectedProductsToInSales')
+      .addItem('📋 Дамп товаров для агента', 'dumpProductsForAgent'));
+
+  categoryMenu.addSubMenu(seoTagsMenu);
+
+  // Управление товарами — подменю
+  const productsMenu = SpreadsheetApp.getUi().createMenu('🛒 Товары в категории')
+    .addItem('➕ Добавить товары', 'showAddProductsDialog')
+    .addItem('📤 Отправить товары с листа в InSales', 'syncProductsFromSheetToInSales')
+    .addItem('🔄 Обновить порядок товаров', 'updateProductPositionsFromSheetV2')
+    .addItem('🗑️ Удалить выбранные товары', 'removeSelectedProductsFromCategory')
+    .addSeparator()
+    .addItem('✅ Сортировать отмеченные категории', 'startBatchSort')
+    .addItem('🔀 Умная сортировка (Разнообразие)', 'smartSortProductsByBrand')
+    .addSeparator()
+    .addItem('🔄 Синхронизировать умную категорию (B10)', 'syncSmartCategory')
+    .addItem('🛠️ Конструктор правил наполнения', 'showSmartRulesBuilderDialog')
+    .addItem('🔄 Наполнить отмеченные категории', 'bulkFillSmartCategories');
+
   categoryMenu
     .addSeparator()
-    .addItem('➕ Добавить товары', 'showAddProductsDialog')
-    .addItem('🗑️ Удалить выбранные товары', 'removeSelectedProductsFromCategory')
+    .addSubMenu(productsMenu)
     .addSeparator();
-  
+
   // Отправка и утилиты
   categoryMenu
     .addItem('📤 Сохранить SEO в InSales', 'sendCategoryChangesToInSales')
     .addSeparator()
     .addSubMenu(SpreadsheetApp.getUi().createMenu('🛠️ Утилиты')
-      .addItem('📊 Статистика', 'showCategoriesStatistics')
-      .addItem('💾 Экспорт в JSON', 'exportCategoryToJSON')
-      .addItem('📋 Клонировать', 'cloneCategorySheet')
+      .addItem('🔄 Синхронизировать с InSales', 'syncCategoriesWithInSales')
+      .addSeparator()
+      .addItem('🔧 Исправить колонки', 'fixCategorySheetColumns')
+      .addSeparator()
       .addItem('🗑️ Удалить лист', 'deleteCategorySheet'));
-  
+
   mainMenu.addSubMenu(categoryMenu);
-  
+
   logInfo('✅ Полное меню категорий добавлено');
 }
 
@@ -97,7 +166,7 @@ function showLSISheet() {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName(CATEGORY_SHEETS.LSI_WORDS);
-    
+
     if (!sheet) {
       SpreadsheetApp.getUi().alert(
         'Лист не найден',
@@ -106,9 +175,9 @@ function showLSISheet() {
       );
       return;
     }
-    
+
     ss.setActiveSheet(sheet);
-    
+
   } catch (error) {
     logError('❌ Ошибка показа LSI', error);
   }
@@ -118,7 +187,7 @@ function showPositionsHistorySheet() {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName(CATEGORY_SHEETS.POSITIONS_HISTORY);
-    
+
     if (!sheet) {
       SpreadsheetApp.getUi().alert(
         'Лист не найден',
@@ -127,9 +196,9 @@ function showPositionsHistorySheet() {
       );
       return;
     }
-    
+
     ss.setActiveSheet(sheet);
-    
+
   } catch (error) {
     logError('❌ Ошибка показа истории позиций', error);
   }
@@ -145,7 +214,7 @@ function showPositionsHistorySheet() {
 function collectKeywordsForActiveCategory() {
   try {
     const categoryData = getActiveCategoryData();
-    
+
     if (!categoryData) {
       SpreadsheetApp.getUi().alert(
         'Ошибка',
@@ -154,9 +223,9 @@ function collectKeywordsForActiveCategory() {
       );
       return;
     }
-    
+
     collectKeywordsForCategory(categoryData);
-    
+
   } catch (error) {
     logError('❌ Ошибка сбора ключевых слов', error);
     SpreadsheetApp.getUi().alert('Ошибка: ' + error.message);
@@ -169,7 +238,7 @@ function collectKeywordsForActiveCategory() {
 function distributeKeywordsForActiveCategory() {
   try {
     const categoryData = getActiveCategoryData();
-    
+
     if (!categoryData) {
       SpreadsheetApp.getUi().alert(
         'Ошибка',
@@ -178,10 +247,10 @@ function distributeKeywordsForActiveCategory() {
       );
       return;
     }
-    
+
     // Получаем ключевые слова из листа
     const keywords = getKeywordsForCategory(categoryData.id);
-    
+
     if (keywords.length === 0) {
       SpreadsheetApp.getUi().alert(
         'Нет ключевых слов',
@@ -190,9 +259,9 @@ function distributeKeywordsForActiveCategory() {
       );
       return;
     }
-    
+
     distributeKeywordsWithAI(categoryData.id, categoryData.title, keywords);
-    
+
   } catch (error) {
     logError('❌ Ошибка распределения ключевиков', error);
     SpreadsheetApp.getUi().alert('Ошибка: ' + error.message);
@@ -205,7 +274,7 @@ function distributeKeywordsForActiveCategory() {
 function analyzeActiveCategory() {
   try {
     const categoryData = getActiveCategoryData();
-    
+
     if (!categoryData) {
       SpreadsheetApp.getUi().alert(
         'Ошибка',
@@ -214,16 +283,16 @@ function analyzeActiveCategory() {
       );
       return;
     }
-    
+
     // Получаем товары категории из листа
     const products = getProductsFromDetailSheet();
-    
+
     // Выполняем анализ
     const analysis = analyzeCurrentCategoryState(categoryData, products);
-    
+
     // Показываем результаты анализа
     showAnalysisResults(analysis);
-    
+
   } catch (error) {
     logError('❌ Ошибка анализа категории', error);
     SpreadsheetApp.getUi().alert('Ошибка: ' + error.message);
@@ -236,7 +305,7 @@ function analyzeActiveCategory() {
 function generateSEOForActiveCategory() {
   try {
     const categoryData = getActiveCategoryData();
-    
+
     if (!categoryData) {
       SpreadsheetApp.getUi().alert(
         'Ошибка',
@@ -245,31 +314,31 @@ function generateSEOForActiveCategory() {
       );
       return;
     }
-    
+
     SpreadsheetApp.getActiveSpreadsheet().toast(
       'Генерируем SEO теги через AI...',
       '⏳ Генерация',
       -1
     );
-    
+
     // Получаем ключевые слова с назначением "seo_title" и "meta_description"
     const keywords = getKeywordsForCategory(categoryData.id);
-    const seoKeywords = keywords.filter(kw => 
+    const seoKeywords = keywords.filter(kw =>
       kw.assignment === 'seo_title' || kw.assignment === 'meta_description'
     );
-    
+
     // Генерируем SEO через AI
     const seoData = generateSEOWithAI(categoryData, seoKeywords);
-    
+
     // Записываем в детальный лист
     updateSEOInDetailSheet(seoData);
-    
+
     SpreadsheetApp.getActiveSpreadsheet().toast(
       'SEO теги сгенерированы!',
       '✅ Готово',
       5
     );
-    
+
   } catch (error) {
     logError('❌ Ошибка генерации SEO', error);
     SpreadsheetApp.getUi().alert('Ошибка: ' + error.message);
@@ -282,7 +351,7 @@ function generateSEOForActiveCategory() {
 function generateTagTilesForActiveCategory() {
   try {
     const categoryData = getActiveCategoryData();
-    
+
     if (!categoryData) {
       SpreadsheetApp.getUi().alert(
         'Ошибка',
@@ -291,32 +360,32 @@ function generateTagTilesForActiveCategory() {
       );
       return;
     }
-    
+
     SpreadsheetApp.getActiveSpreadsheet().toast(
       'Создаем плитку тегов через AI...',
       '⏳ Создание',
       -1
     );
-    
+
     // Получаем все категории для подбора релевантных ссылок
     const allCategories = getAllCategoriesFromMainList();
-    
+
     // Получаем ключевые слова с назначением "tag_tiles"
     const keywords = getKeywordsForCategory(categoryData.id);
     const tagKeywords = keywords.filter(kw => kw.assignment === 'tag_tiles');
-    
+
     // Генерируем плитку тегов через AI
     const tagTiles = generateTagTilesWithAI(categoryData, tagKeywords, allCategories);
-    
+
     // Записываем в детальный лист
     writeTagTilesToDetailSheet(tagTiles);
-    
+
     SpreadsheetApp.getActiveSpreadsheet().toast(
       `Создано ${tagTiles.length} тегов!`,
       '✅ Готово',
       5
     );
-    
+
   } catch (error) {
     logError('❌ Ошибка создания плитки тегов', error);
     SpreadsheetApp.getUi().alert('Ошибка: ' + error.message);
@@ -330,7 +399,7 @@ function showKeywordsSheet() {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName(CATEGORY_SHEETS.KEYWORDS);
-    
+
     if (!sheet) {
       SpreadsheetApp.getUi().alert(
         'Лист не найден',
@@ -339,9 +408,9 @@ function showKeywordsSheet() {
       );
       return;
     }
-    
+
     ss.setActiveSheet(sheet);
-    
+
   } catch (error) {
     logError('❌ Ошибка показа листа ключевых слов', error);
   }
@@ -355,7 +424,7 @@ function analyzeActiveCategoryFromMenu() {
     // Проверяем, что открыт правильный лист
     const sheet = SpreadsheetApp.getActiveSheet();
     const sheetName = sheet.getName();
-    
+
     if (!sheetName.startsWith(CATEGORY_SHEETS.DETAIL_PREFIX)) {
       SpreadsheetApp.getUi().alert(
         'Ошибка',
@@ -365,10 +434,10 @@ function analyzeActiveCategoryFromMenu() {
       );
       return;
     }
-    
+
     // Вызываем функцию анализа
     analyzeActiveCategory();
-    
+
   } catch (error) {
     SpreadsheetApp.getUi().alert(
       'Ошибка',
